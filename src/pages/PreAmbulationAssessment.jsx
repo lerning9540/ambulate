@@ -1,64 +1,54 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { assessmentAPI } from '../services/api';
+import { assessmentAPI, checklistAPI, taskAPI } from '../services/api';
 import Header from '../components/Header';
-import { CheckCircle2, Circle } from 'lucide-react';
+import { CheckCircle2, XCircle, Circle } from 'lucide-react';
+import { evaluateItem, evaluateChecklist, criteriaText } from '../../shared/checklist.js';
+import { StatusPill, fmtDateTime } from '../lib/status';
 
+// Checklist ก่อนลุกเดิน: เกณฑ์มาจากฐานข้อมูล (หัวหน้าเวรแก้ได้)
+// กรอกค่าแล้วขึ้นเขียว (ผ่าน) / แดง (ไม่ผ่าน) ทันที ระบบสรุปผล READY / NOT READY เอง
 export default function PreAmbulationAssessment({ showToast }) {
-  const { id } = useParams();
+  const { taskId } = useParams();
   const navigate = useNavigate();
-  const [painScore, setPainScore] = useState(2);
+  const [task, setTask] = useState(null);
+  const [items, setItems] = useState([]);
+  const [values, setValues] = useState({});
+  const [saved, setSaved] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  const [vitals, setVitals] = useState({
-    bp: '',
-    hr: '',
-    rr: '',
-    spo2: '',
-    temp: ''
-  });
+  useEffect(() => {
+    Promise.all([taskAPI.getById(taskId), checklistAPI.getAll()])
+      .then(([t, list]) => {
+        setTask(t);
+        setItems(list);
+      })
+      .catch((err) => showToast(err.message, 'error'));
+  }, [taskId, showToast]);
 
-  const [checks, setChecks] = useState({
-    item2: false,
-    item3: false,
-    item4: false,
-    item5: false,
-    item6: false,
-    item7: false,
-    item8: false
-  });
+  if (!task) return <div className="app-container flex-center">กำลังโหลด...</div>;
 
-  const toggleCheck = (item) => setChecks(prev => ({ ...prev, [item]: !prev[item] }));
+  const isCopd = task.patient.isCopd;
+  const evaluation = evaluateChecklist(items, values, isCopd);
+  const set = (code, v) => setValues((prev) => ({ ...prev, [code]: v }));
 
-  const handleAssessment = async (isReady) => {
+  const groups = [];
+  for (const item of items) {
+    let g = groups.find((x) => x.groupNo === item.groupNo);
+    if (!g) groups.push((g = { groupNo: item.groupNo, label: item.groupLabel, items: [] }));
+    g.items.push(item);
+  }
+
+  const handleSave = async () => {
+    if (!evaluation.complete) {
+      showToast(`กรุณากรอกให้ครบ: ${evaluation.missing.join(', ')}`, 'error');
+      return;
+    }
     setLoading(true);
     try {
-      const [sys, dia] = vitals.bp.split('/').map(n => parseInt(n) || 0);
-      
-      // Create assessment record based on button clicked
-      await assessmentAPI.create({
-        patientId: id,
-        systolicBP: sys || 120, // default if empty
-        diastolicBP: dia || 80,
-        heartRate: parseInt(vitals.hr) || 80,
-        temperature: parseFloat(vitals.temp) || 36.5,
-        painScore: parseInt(painScore),
-        isConscious: checks.item2,
-        noDoctorRestriction: checks.item3,
-        drainSecure: checks.item5,
-        noActiveBleeding: checks.item6,
-        noOrthostatic: checks.item7,
-        noDizziness: checks.item8,
-        result: isReady ? 'READY' : 'NOT_READY'
-      });
-      
-      showToast(isReady ? 'บันทึกความพร้อมสำเร็จ' : 'บันทึกสถานะยังไม่พร้อมสำเร็จ', isReady ? 'success' : 'warning');
-      
-      if (isReady) {
-        navigate(`/patient/${id}/ambulation`);
-      } else {
-        navigate(`/patient/${id}`);
-      }
+      const a = await assessmentAPI.create({ taskId, values });
+      setSaved(a);
+      window.scrollTo(0, 0);
     } catch (error) {
       showToast(error.message || 'เกิดข้อผิดพลาดในการบันทึก', 'error');
     } finally {
@@ -66,137 +56,121 @@ export default function PreAmbulationAssessment({ showToast }) {
     }
   };
 
-  const CheckIcon = () => <CheckCircle2 size={20} color="var(--status-green)" />;
+  const Mark = ({ passed }) =>
+    passed === null ? <Circle size={20} color="var(--border-color)" /> : passed ? <CheckCircle2 size={20} color="var(--status-green)" /> : <XCircle size={20} color="var(--status-red)" />;
+
+  const tint = (passed) => (passed === null ? {} : passed ? { borderColor: 'var(--status-green)', background: '#f3fbf5' } : { borderColor: 'var(--status-red)', background: '#fdf3f4' });
+
+  // หลังบันทึก: แสดงผลสรุป
+  if (saved) {
+    const ready = saved.result === 'READY';
+    return (
+      <>
+        <Header title="ผลการประเมิน" showBack={true} />
+        <div className="page-content">
+          <div className="detail-card" style={{ padding: 20, textAlign: 'center', background: ready ? '#d4edda' : '#f8d7da' }}>
+            <div style={{ fontSize: 22, fontWeight: 700, color: ready ? '#155724' : '#a71d2a' }}>{ready ? 'READY TO AMBULATE' : 'NOT READY TO AMBULATE'}</div>
+            <div style={{ fontSize: 13, marginTop: 6 }}>
+              {task.patient.name} (AN {task.patient.an}) · รอบที่ {task.roundNo}
+              <br />
+              ประเมิน {fmtDateTime(saved.assessedAt)} โดย {saved.assessedByName}
+            </div>
+          </div>
+          {!ready && (
+            <div className="detail-card" style={{ padding: 16 }}>
+              <h2 className="section-title" style={{ marginTop: 0 }}>ข้อที่ไม่ผ่าน</h2>
+              {saved.failedReasons.map((f) => (
+                <div key={f.code} style={{ marginBottom: 10 }}>
+                  <div style={{ fontWeight: 600, color: 'var(--status-red)' }}>{f.label}</div>
+                  <div style={{ fontSize: 13 }}>{f.reason}</div>
+                  {f.advice && <div style={{ fontSize: 13, color: 'var(--primary-blue)' }}>คำแนะนำ: {f.advice}</div>}
+                </div>
+              ))}
+              <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                ยังไม่นับว่าได้ลุกเดิน และถ้าเกิน 1 ชม. หลังเวลาที่กำหนดยังไม่ได้บันทึกผล จะนับเป็นล่าช้า (Late)
+              </div>
+            </div>
+          )}
+          {ready ? (
+            <button className="btn btn-success" onClick={() => navigate(`/task/${taskId}/ambulation`, { replace: true })}>ไปบันทึกผลการลุกเดิน</button>
+          ) : (
+            <button className="btn btn-primary" onClick={() => navigate(`/patient/${task.patientId}`, { replace: true })}>กลับหน้าผู้ป่วย</button>
+          )}
+        </div>
+      </>
+    );
+  }
 
   return (
     <>
       <Header title="Checklist ก่อน Ambulate" showBack={true} />
-      
+
       <div className="page-content">
-        <div className="checklist-item">
-          <div className="checklist-header">
-            <span>1. สัญญาณชีพปกติ</span>
-          </div>
-          <div className="checklist-vital-grid">
-            <div className="vital-row" style={{ marginBottom: 12 }}>
-              <span className="vital-label" style={{ width: 60 }}>BP</span>
-              <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 8 }}>
-                <input type="text" className="form-input" style={{ margin: 0, padding: '6px 8px' }} placeholder="120/80" value={vitals.bp} onChange={(e) => setVitals({...vitals, bp: e.target.value})} />
-                <span style={{ fontSize: 13, width: 50, color: 'var(--text-muted)' }}>mmHg</span>
-              </div>
-            </div>
-            <div className="vital-row" style={{ marginBottom: 12 }}>
-              <span className="vital-label" style={{ width: 60 }}>HR</span>
-              <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 8 }}>
-                <input type="number" className="form-input" style={{ margin: 0, padding: '6px 8px' }} placeholder="80" value={vitals.hr} onChange={(e) => setVitals({...vitals, hr: e.target.value})} />
-                <span style={{ fontSize: 13, width: 50, color: 'var(--text-muted)' }}>/min</span>
-              </div>
-            </div>
-            <div className="vital-row" style={{ marginBottom: 12 }}>
-              <span className="vital-label" style={{ width: 60 }}>RR</span>
-              <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 8 }}>
-                <input type="number" className="form-input" style={{ margin: 0, padding: '6px 8px' }} placeholder="20" value={vitals.rr} onChange={(e) => setVitals({...vitals, rr: e.target.value})} />
-                <span style={{ fontSize: 13, width: 50, color: 'var(--text-muted)' }}>/min</span>
-              </div>
-            </div>
-            <div className="vital-row" style={{ marginBottom: 12 }}>
-              <span className="vital-label" style={{ width: 60 }}>SpO₂</span>
-              <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 8 }}>
-                <input type="number" className="form-input" style={{ margin: 0, padding: '6px 8px' }} placeholder="98" value={vitals.spo2} onChange={(e) => setVitals({...vitals, spo2: e.target.value})} />
-                <span style={{ fontSize: 13, width: 50, color: 'var(--text-muted)' }}>%</span>
-              </div>
-            </div>
-            <div className="vital-row" style={{ marginBottom: 12 }}>
-              <span className="vital-label" style={{ width: 60 }}>Temp</span>
-              <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 8 }}>
-                <input type="number" step="0.1" className="form-input" style={{ margin: 0, padding: '6px 8px' }} placeholder="36.5" value={vitals.temp} onChange={(e) => setVitals({...vitals, temp: e.target.value})} />
-                <span style={{ fontSize: 13, width: 50, color: 'var(--text-muted)' }}>°C</span>
-              </div>
-            </div>
-          </div>
+        <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 12 }}>
+          {task.patient.name} (AN {task.patient.an}) · รอบที่ {task.roundNo} · กำหนด {fmtDateTime(task.scheduledAt)} น.
+          {isCopd && <span style={{ color: 'var(--primary-blue)', fontWeight: 600 }}> · ผู้ป่วย COPD</span>}
         </div>
 
-        <div className="checklist-item" onClick={() => toggleCheck('item2')} style={{ cursor: 'pointer' }}>
-          <div className="checklist-header">
-            <span>2. ไม่มีอาการสับสน หรือก้าวร้าวรุนแรง</span>
-            {checks.item2 ? <CheckCircle2 size={20} color="var(--status-green)" /> : <Circle size={20} color="var(--border-color)" />}
-          </div>
-        </div>
-
-        <div className="checklist-item" onClick={() => toggleCheck('item3')} style={{ cursor: 'pointer' }}>
-          <div className="checklist-header">
-            <span>3. ไม่มีแน่นหน้าอก หรือ EKG ปกติ</span>
-            {checks.item3 ? <CheckCircle2 size={20} color="var(--status-green)" /> : <Circle size={20} color="var(--border-color)" />}
-          </div>
-        </div>
-
-        <div className="checklist-item">
-          <div className="checklist-header">
-            <span>4. Pain score &lt; 3/10</span>
-          </div>
-          <div className="pain-score-input">
-            <span style={{ fontSize: 14 }}>Pain score</span>
-            <input 
-              type="number" 
-              className="pain-input" 
-              value={painScore}
-              onChange={(e) => setPainScore(e.target.value)}
-              min="0" max="10"
-            />
-            <span style={{ fontSize: 14 }}>/ 10</span>
-            <div style={{ marginLeft: 8 }}>
-              {parseInt(painScore) < 3 ? <CheckCircle2 size={20} color="var(--status-green)" /> : <Circle size={20} color="var(--border-color)" />}
+        {groups.map((g) => (
+          <div className="checklist-item" key={g.groupNo}>
+            <div className="checklist-header" style={{ marginBottom: g.items.length > 1 || g.items[0].kind !== 'BOOL' ? 8 : 0 }}>
+              <span>
+                {g.groupNo}. {g.label}
+              </span>
             </div>
+            {g.items.map((item) => {
+              const { value, passed } = evaluateItem(item, values, isCopd);
+              if (item.kind === 'BOOL') {
+                const v = values[item.code];
+                return (
+                  <div key={item.id} style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border-color)', marginTop: 6, ...tint(passed) }}>
+                    {(g.items.length > 1 || item.label !== g.label) && <div style={{ fontSize: 13, marginBottom: 6 }}>{item.label}</div>}
+                    {item.description && <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 6 }}>{item.description}</div>}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <div className="segmented-control" style={{ marginBottom: 0, flex: 1 }}>
+                        <button type="button" className={`segment-btn ${v === true ? 'active' : ''}`} onClick={() => set(item.code, true)}>ผ่าน</button>
+                        <button type="button" className={`segment-btn ${v === false ? 'active' : ''}`} onClick={() => set(item.code, false)}>ไม่ผ่าน</button>
+                      </div>
+                      <Mark passed={passed} />
+                    </div>
+                  </div>
+                );
+              }
+              return (
+                <div key={item.id} className="vital-row" style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 8px', borderRadius: 8, border: '1px solid transparent', marginTop: 4, ...tint(passed) }}>
+                  <div style={{ width: 110, fontSize: 13 }}>
+                    {item.label}
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{criteriaText(item, isCopd)}</div>
+                  </div>
+                  {item.kind === 'MAP' ? (
+                    <div style={{ flex: 1, fontWeight: 600 }}>{value ?? '-'}</div>
+                  ) : (
+                    <input
+                      type="number"
+                      inputMode="decimal"
+                      step="any"
+                      className="form-input"
+                      style={{ margin: 0, padding: '6px 8px', flex: 1 }}
+                      value={values[item.code] ?? ''}
+                      onChange={(e) => set(item.code, e.target.value)}
+                    />
+                  )}
+                  <span style={{ fontSize: 12, width: 56, color: 'var(--text-muted)' }}>{item.unit}</span>
+                  <Mark passed={passed} />
+                </div>
+              );
+            })}
           </div>
+        ))}
+
+        <div className="detail-card" style={{ padding: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span style={{ fontSize: 13 }}>ผลประเมิน (อัตโนมัติ)</span>
+          {evaluation.complete ? <StatusPill status={evaluation.result} /> : <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>ยังกรอกไม่ครบ {evaluation.missing.length} ข้อ</span>}
         </div>
 
-        <div className="checklist-item" onClick={() => toggleCheck('item5')} style={{ cursor: 'pointer' }}>
-          <div className="checklist-header">
-            <span>5. ไม่มีท่อระบายที่เป็นอุปสรรคต่อการเคลื่อนไหว</span>
-            {checks.item5 ? <CheckCircle2 size={20} color="var(--status-green)" /> : <Circle size={20} color="var(--border-color)" />}
-          </div>
-        </div>
-
-        <div className="checklist-item" onClick={() => toggleCheck('item6')} style={{ cursor: 'pointer' }}>
-          <div className="checklist-header" style={{ alignItems: 'flex-start' }}>
-            <div>
-              <div>6. แผลไม่มีเลือดซึมผิดปกติ</div>
-              <div style={{ fontSize: 12, fontWeight: 400, marginTop: 4 }}>Hct &ge; 25% หรือ Plt &gt; 20,000</div>
-            </div>
-            {checks.item6 ? <CheckCircle2 size={20} color="var(--status-green)" /> : <Circle size={20} color="var(--border-color)" />}
-          </div>
-        </div>
-
-        <div className="checklist-item" onClick={() => toggleCheck('item7')} style={{ cursor: 'pointer' }}>
-          <div className="checklist-header">
-            <span>7. Capillary refil time &lt; 2-3 sec</span>
-            {checks.item7 ? <CheckCircle2 size={20} color="var(--status-green)" /> : <Circle size={20} color="var(--border-color)" />}
-          </div>
-        </div>
-
-        <div className="checklist-item" onClick={() => toggleCheck('item8')} style={{ cursor: 'pointer' }}>
-          <div className="checklist-header" style={{ alignItems: 'flex-start' }}>
-            <div style={{ paddingRight: 10 }}>
-              8. ไม่มีวิงเวียน บ้านหมุน หน้ามืด ใจสั่น หายใจหอบเหนื่อยผิดปกติ หลังเปลี่ยนอิริยาบถ
-            </div>
-            {checks.item8 ? <CheckCircle2 size={20} color="var(--status-green)" /> : <Circle size={20} color="var(--border-color)" />}
-          </div>
-        </div>
-
-        <div className="action-buttons">
-          <button 
-            className="btn btn-success" 
-            onClick={() => handleAssessment(true)}
-            disabled={loading}
-          >
-            พร้อมลุกเดิน
-          </button>
-          <button 
-            className="btn btn-danger" 
-            onClick={() => handleAssessment(false)}
-            disabled={loading}
-          >
-            ยังไม่พร้อม
+        <div className="action-buttons" style={{ position: 'static' }}>
+          <button className="btn btn-primary" onClick={handleSave} disabled={loading}>
+            {loading ? 'กำลังบันทึก...' : 'บันทึกผลการประเมิน'}
           </button>
         </div>
       </div>

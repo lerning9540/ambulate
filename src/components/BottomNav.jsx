@@ -10,7 +10,7 @@ export default function BottomNav() {
         <span>Dashboard</span>
       </NavLink>
       
-      <NavLink to="/register" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+      <NavLink to="/patients" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
         <User size={24} />
         <span>ผู้ป่วย</span>
       </NavLink>

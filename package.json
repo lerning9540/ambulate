@@ -11,7 +11,10 @@
     "preview": "vite preview",
     "db:push": "prisma db push",
     "db:studio": "prisma studio",
-    "prisma:generate": "prisma generate"
+    "prisma:generate": "prisma generate",
+    "db:seed": "node server/seed.js",
+    "make-head": "node server/make-head-nurse.js",
+    "start": "node server/index.js"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.5.4",

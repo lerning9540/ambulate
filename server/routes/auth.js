@@ -2,9 +2,9 @@ import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import prisma from '../db.js';
+import { JWT_SECRET } from '../middleware/auth.js';
 
 const router = Router();
-const JWT_SECRET = process.env.JWT_SECRET || 'sara_super_secret_key_12345';
 
 // POST /api/auth/register
 router.post('/register', async (req, res) => {
@@ -33,6 +33,7 @@ router.post('/register', async (req, res) => {
         id: true,
         username: true,
         name: true,
+        role: true,
       }
     });
 
@@ -63,7 +64,7 @@ router.post('/login', async (req, res) => {
     }
 
     const token = jwt.sign(
-      { id: nurse.id, username: nurse.username, name: nurse.name },
+      { id: nurse.id, username: nurse.username, name: nurse.name, role: nurse.role },
       JWT_SECRET,
       { expiresIn: '24h' }
     );
@@ -71,7 +72,7 @@ router.post('/login', async (req, res) => {
     res.json({
       message: 'เข้าสู่ระบบสำเร็จ',
       token,
-      user: { id: nurse.id, username: nurse.username, name: nurse.name }
+      user: { id: nurse.id, username: nurse.username, name: nurse.name, role: nurse.role }
     });
   } catch (error) {
     console.error('Login error:', error);
