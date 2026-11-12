@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import Header from '../components/Header';
-import { Download } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { patientAPI } from '../services/api';
+import { todayLocal } from '../lib/status';
 
 export default function Reports() {
   const [data, setData] = useState({
@@ -13,11 +13,17 @@ export default function Reports() {
     chartData: []
   });
   const [loading, setLoading] = useState(true);
+  const [to, setTo] = useState(todayLocal());
+  const [from, setFrom] = useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 9);
+    return d.toLocaleDateString('sv-SE');
+  });
 
   useEffect(() => {
     const loadData = async () => {
       try {
-        const result = await patientAPI.getReports();
+        const result = await patientAPI.getReports(from, to);
         setData(result);
       } catch (err) {
         console.error('Failed to load reports', err);
@@ -26,21 +32,23 @@ export default function Reports() {
       }
     };
     loadData();
-  }, []);
+  }, [from, to]);
 
   return (
     <>
       <Header 
         title="รายงานสถิติ" 
         showBack={true} 
-        rightElement={<Download className="header-icon" />} 
+
       />
       
       <div className="page-content">
         <div className="date-picker">
           <span>ช่วงวันที่</span>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#f8f9fa', padding: '6px 12px', borderRadius: 8 }}>
-            <span>ทั้งหมด (อัปเดตล่าสุด)</span>
+            <input type="date" value={from} max={to} onChange={(e) => e.target.value && setFrom(e.target.value)} style={{ border: 'none', background: 'transparent', fontFamily: 'inherit' }} />
+            <span>-</span>
+            <input type="date" value={to} min={from} onChange={(e) => e.target.value && setTo(e.target.value)} style={{ border: 'none', background: 'transparent', fontFamily: 'inherit' }} />
           </div>
         </div>
 
@@ -54,15 +62,15 @@ export default function Reports() {
                 <div className="stat-val">{data.onTimeRate}<span className="stat-unit">%</span></div>
               </div>
               <div className="stat-box">
-                <div className="stat-label">จำนวนผู้ป่วยทั้งหมด</div>
+                <div className="stat-label">จำนวนผู้ป่วยที่มีแผนลุกเดิน</div>
                 <div className="stat-val">{data.totalPatients} <span className="stat-unit">ราย</span></div>
               </div>
               <div className="stat-box">
-                <div className="stat-label">เวลาเฉลี่ยก่อนเริ่ม Ambulate</div>
+                <div className="stat-label">เวลาเฉลี่ยจากออกห้องผ่าตัดถึงลุกเดินครั้งแรก</div>
                 <div className="stat-val" style={{ fontSize: 18 }}>{data.avgTimeStr}</div>
               </div>
               <div className="stat-box">
-                <div className="stat-label">บันทึกข้อมูลครบถ้วน</div>
+                <div className="stat-label">กิจกรรมที่บันทึกผลแล้ว</div>
                 <div className="stat-val">{data.completionRate}<span className="stat-unit">%</span></div>
               </div>
             </div>

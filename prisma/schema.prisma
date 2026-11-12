@@ -1,5 +1,5 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
+// SARA - Smart Ambulation Reminder & Assessment
+// โครงสร้างฐานข้อมูล (PostgreSQL / Supabase)
 
 generator client {
   provider = "prisma-client-js"
@@ -9,81 +9,162 @@ datasource db {
   provider = "postgresql"
 }
 
-model Patient {
-  id              String    @id @default(uuid())
-  an              String    @unique          // เลข AN 8 หลัก
-  name            String                     // ชื่อผู้ป่วย
-  age             Int                        // อายุ
-  gender          String                     // เพศ: MALE / FEMALE
-  surgeryType     String                     // ชนิดการผ่าตัด
-  orDischargeAt   DateTime                   // วันเวลาออกจากห้องผ่าตัด
-  reminderHours   Int       @default(6)      // 6 หรือ 12 ชม.
-  scheduledAt     DateTime                   // เวลาที่ต้องกระตุ้นลุกเดิน (คำนวณอัตโนมัติ)
-  useLaxative     Boolean   @default(false)  // ใช้ยาระบาย
-  usePainMed      Boolean   @default(false)  // ใช้ยาแก้ปวด
-  hasRestriction  Boolean   @default(false)  // มีข้อจำกัดจากคำสั่งแพทย์
-  restrictionNote String?                    // รายละเอียดข้อจำกัด
-  status          String    @default("PENDING") // PENDING / DUE / COMPLETED / OVERDUE
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-
-  assessments     Assessment[]
-  ambulations     Ambulation[]
-  notifications   Notification[]
-}
-
-model Assessment {
-  id                  String   @id @default(uuid())
-  patientId           String
-  patient             Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
-  systolicBP          Int                // Systolic BP (mmHg)
-  diastolicBP         Int                // Diastolic BP (mmHg)
-  heartRate           Int                // อัตราการเต้นหัวใจ (bpm)
-  temperature         Float              // อุณหภูมิ (°C)
-  painScore           Int                // Pain Score 0-10
-  noDizziness         Boolean            // ไม่มีอาการวิงเวียน/คลื่นไส้รุนแรง
-  noActiveBleeding    Boolean            // ไม่มี Active Bleeding
-  isConscious         Boolean            // รู้สึกตัวดี สามารถรับคำสั่งได้
-  noOrthostatic       Boolean            // ไม่มี Orthostatic Hypotension
-  drainSecure         Boolean            // Drain/Tube มั่นคง ไม่เลื่อนหลุด
-  noDoctorRestriction Boolean            // ไม่มีข้อห้ามจากแพทย์
-  result              String             // READY / NOT_READY
-  failedReasons       String?            // สาเหตุที่ไม่ผ่าน (JSON array string)
-  assessedAt          DateTime @default(now())
-}
-
-model Ambulation {
-  id               String   @id @default(uuid())
-  patientId        String
-  patient          Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
-  startTime        DateTime             // เวลาเริ่มเดิน
-  endTime          DateTime             // เวลาหยุดเดิน
-  distance         Float?               // ระยะทาง (เมตร)
-  duration         Int?                 // ระยะเวลา (นาที)
-  assistLevel      String               // INDEPENDENT / ARM_SUPPORT / WALKER / WHEELCHAIR
-  symptomsDuring   String               // NORMAL / DIZZY / FATIGUE / SEVERE_PAIN / OTHER
-  symptomsAfter    String               // NORMAL / ABNORMAL
-  symptomsNote     String?              // รายละเอียดอาการ
-  complication     String               // NONE / FALL / DRAIN_DISLODGE / OTHER
-  complicationNote String?              // รายละเอียดภาวะแทรกซ้อน
-  recordedAt       DateTime @default(now())
-}
-
-model Notification {
-  id          String   @id @default(uuid())
-  patientId   String
-  patient     Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
-  type        String               // INITIAL / REMINDER
-  message     String
-  isRead      Boolean  @default(false)
-  sentAt      DateTime @default(now())
-}
-
 model Nurse {
   id        String   @id @default(uuid())
   username  String   @unique
   name      String
   password  String
+  role      String   @default("NURSE") // NURSE / HEAD_NURSE
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model Patient {
+  id                String   @id @default(uuid())
+  an                String   @unique          // เลข AN 8 หลัก
+  name              String
+  age               Int
+  gender            String                     // M / F
+  bed               String?                    // เตียง (ไม่บังคับ)
+  surgeryType       String
+  orDischargeAt     DateTime                   // วันเวลาออกจากห้องผ่าตัด
+  linesDevices      String?                    // สายและอุปกรณ์ที่ติดตัวผู้ป่วย
+  doctorRestriction String?                    // ข้อจำกัดการลุกเดินตามคำสั่งแพทย์
+  note              String?                    // หมายเหตุเพิ่มเติม
+  isCopd            Boolean  @default(false)   // ผู้ป่วย COPD (ใช้เกณฑ์ SpO2 >= 92%)
+  createdById       String?
+  updatedById       String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  tasks         AmbulationTask[]
+  incidents     Incident[]
+  notifications Notification[]
+}
+
+// กิจกรรมลุกเดินแต่ละรอบ (ผู้ป่วย 1 คนมีได้หลายรอบ)
+model AmbulationTask {
+  id             String    @id @default(uuid())
+  patientId      String
+  patient        Patient   @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  roundNo        Int
+  scheduledAt    DateTime                    // Scheduled Time
+  dueNotifiedAt  DateTime?                   // ส่งแจ้งเตือนถึงเวลาแล้วเมื่อไร
+  lateNotifiedAt DateTime?                   // ส่งแจ้งเตือนล่าช้า (+1 ชม.) แล้วเมื่อไร
+  createdById    String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  scheduleChanges ScheduleChange[]
+  assessments     Assessment[]
+  record          AmbulationRecord?
+  notifications   Notification[]
+
+  @@index([scheduledAt])
+}
+
+// ประวัติการแก้เวลา
+model ScheduleChange {
+  id          String         @id @default(uuid())
+  taskId      String
+  task        AmbulationTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  oldAt       DateTime
+  newAt       DateTime
+  changedById String?
+  changedAt   DateTime       @default(now())
+}
+
+// เกณฑ์ Checklist (แก้ได้จากหน้าเว็บโดยหัวหน้าเวร)
+model ChecklistItem {
+  id           String  @id @default(uuid())
+  code         String  @unique
+  groupNo      Int                        // ลำดับข้อตามแบบฟอร์ม (1-8)
+  groupLabel   String                     // ชื่อข้อ เช่น "สัญญาณชีพปกติ"
+  label        String                     // ชื่อรายการย่อย
+  kind         String                     // NUMBER / BOOL / MAP
+  unit         String?
+  minValue     Float?
+  minInclusive Boolean @default(false)
+  maxValue     Float?
+  maxInclusive Boolean @default(false)
+  copdMinValue Float?                     // เกณฑ์ขั้นต่ำสำหรับผู้ป่วย COPD
+  description  String?
+  advice       String?                    // คำแนะนำเมื่อไม่ผ่าน
+  sortOrder    Int     @default(0)
+  active       Boolean @default(true)
+}
+
+model Assessment {
+  id            String         @id @default(uuid())
+  taskId        String
+  task          AmbulationTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  result        String                     // READY / NOT_READY
+  failedReasons Json?
+  answers       Json                       // [{code,label,value,passed}]
+  isCopd        Boolean        @default(false)
+  assessedById  String?
+  assessedByName String?
+  assessedAt    DateTime       @default(now())  // Assessment Time
+}
+
+model AmbulationRecord {
+  id             String         @id @default(uuid())
+  taskId         String         @unique
+  task           AmbulationTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  startTime      DateTime                   // Start Time (ใช้คำนวณตรงเวลา/ล่าช้า)
+  endTime        DateTime                   // End Time
+  distance       Float?                     // เมตร
+  duration       Int?                       // นาที
+  assistLevel    String
+  tolerance      String?
+  symptomsDuring String?
+  symptomsAfter  String?
+  complication   String?                    // ภาวะแทรกซ้อน/เหตุการณ์ผิดปกติ
+  stoppedEarly   Boolean        @default(false)
+  note           String?
+  recordedById   String?
+  recordedByName String?
+  recordedAt     DateTime       @default(now())  // Record Time
+}
+
+model Incident {
+  id            String    @id @default(uuid())
+  patientId     String
+  patient       Patient   @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  recordId      String?
+  detail        String
+  status        String    @default("OPEN")   // OPEN / CLOSED
+  createdById   String?
+  createdByName String?
+  createdAt     DateTime  @default(now())
+  closedById    String?
+  closedByName  String?
+  closedAt      DateTime?
+  closeNote     String?
+}
+
+model Notification {
+  id        String          @id @default(uuid())
+  patientId String
+  patient   Patient         @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  taskId    String?
+  task      AmbulationTask? @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  type      String                          // DUE / LATE / INCIDENT
+  message   String
+  isRead    Boolean         @default(false)
+  sentAt    DateTime        @default(now())
+}
+
+// ประวัติการเพิ่ม/แก้ไขข้อมูล
+model AuditLog {
+  id        String   @id @default(uuid())
+  nurseId   String?
+  nurseName String?
+  action    String                          // CREATE / UPDATE / DELETE
+  entity    String
+  entityId  String?
+  detail    Json?
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
 }

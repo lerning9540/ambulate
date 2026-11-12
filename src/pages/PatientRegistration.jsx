@@ -1,23 +1,49 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { addHours } from 'date-fns';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import { patientAPI } from '../services/api';
+import { toLocalInput } from '../lib/status';
 import Header from '../components/Header';
 import { User, Activity, Clock, FileText } from 'lucide-react';
 
 export default function PatientRegistration({ showToast }) {
   const navigate = useNavigate();
+  const { id } = useParams(); // มี id = โหมดแก้ไข
+  const isEdit = Boolean(id);
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({
     an: '',
     name: '',
     age: '',
     gender: 'M',
+    bed: '',
     surgeryType: '',
     orDischargeTime: '',
-    reminderHours: 6,
-    restrictionNote: ''
+    firstScheduledTime: '',
+    linesDevices: '',
+    doctorRestriction: '',
+    note: '',
+    isCopd: false,
   });
+
+  useEffect(() => {
+    if (!isEdit) return;
+    patientAPI.getById(id).then((p) =>
+      setForm({
+        an: p.an,
+        name: p.name,
+        age: String(p.age),
+        gender: p.gender,
+        bed: p.bed || '',
+        surgeryType: p.surgeryType,
+        orDischargeTime: toLocalInput(p.orDischargeAt),
+        firstScheduledTime: '',
+        linesDevices: p.linesDevices || '',
+        doctorRestriction: p.doctorRestriction || '',
+        note: p.note || '',
+        isCopd: p.isCopd,
+      })
+    ).catch((err) => showToast(err.message, 'error'));
+  }, [id, isEdit, showToast]);
 
   const surgeryTypes = [
     'ผ่าตัดช่องท้อง (Abdominal)',
@@ -29,33 +55,40 @@ export default function PatientRegistration({ showToast }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!form.an || !form.name || !form.age || !form.surgeryType || !form.orDischargeTime) {
+    if (!/^\d{8}$/.test(form.an)) {
+      showToast('AN ต้องเป็นตัวเลข 8 หลัก', 'error');
+      return;
+    }
+    if (!form.an || !form.name || !form.age || !form.surgeryType || !form.orDischargeTime || (!isEdit && !form.firstScheduledTime)) {
       showToast('กรุณากรอกข้อมูลสำคัญให้ครบถ้วน', 'error');
       return;
     }
 
     setLoading(true);
     try {
-      const surgeryDateTime = new Date(form.orDischargeTime);
-      const scheduledAt = addHours(surgeryDateTime, form.reminderHours);
-
-      await patientAPI.create({
+      const payload = {
         an: form.an,
         name: form.name,
         age: parseInt(form.age),
         gender: form.gender,
+        bed: form.bed,
         surgeryType: form.surgeryType,
-        orDischargeAt: surgeryDateTime.toISOString(), // Sent as orDischargeAt based on schema
-        reminderHours: form.reminderHours,
-        scheduledAt: scheduledAt.toISOString(),
-        useLaxative: false,
-        usePainMed: false,
-        hasRestriction: !!form.restrictionNote,
-        restrictionNote: form.restrictionNote,
-      });
+        orDischargeAt: new Date(form.orDischargeTime).toISOString(),
+        linesDevices: form.linesDevices,
+        doctorRestriction: form.doctorRestriction,
+        note: form.note,
+        isCopd: form.isCopd,
+      };
 
-      showToast('ลงทะเบียนผู้ป่วยใหม่สำเร็จ', 'success');
-      navigate('/');
+      if (isEdit) {
+        await patientAPI.update(id, payload);
+        showToast('บันทึกการแก้ไขแล้ว', 'success');
+        navigate(`/patient/${id}`);
+      } else {
+        const p = await patientAPI.create({ ...payload, firstScheduledAt: new Date(form.firstScheduledTime).toISOString() });
+        showToast('ลงทะเบียนผู้ป่วยใหม่สำเร็จ', 'success');
+        navigate(`/patient/${p.id}`);
+      }
     } catch (err) {
       showToast(err.message || 'เกิดข้อผิดพลาดในการบันทึก', 'error');
     } finally {
@@ -65,7 +98,7 @@ export default function PatientRegistration({ showToast }) {
 
   return (
     <>
-      <Header title="ลงทะเบียนผู้ป่วยใหม่" showBack={true} />
+      <Header title={isEdit ? 'แก้ไขข้อมูลผู้ป่วย' : 'ลงทะเบียนผู้ป่วยใหม่'} showBack={true} />
       
       <div className="page-content">
         <form onSubmit={handleSubmit}>
@@ -120,6 +153,17 @@ export default function PatientRegistration({ showToast }) {
                 </div>
               </div>
             </div>
+
+            <div style={{ display: 'flex', gap: 12, marginTop: 12, alignItems: 'flex-end' }}>
+              <div style={{ flex: 1 }}>
+                <label style={{ display: 'block', fontSize: 13, marginBottom: 4 }}>เตียง (ถ้ามี)</label>
+                <input type="text" className="form-input" value={form.bed} onChange={(e) => setForm({...form, bed: e.target.value})} style={{ marginBottom: 0 }} />
+              </div>
+              <label style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, paddingBottom: 10 }}>
+                <input type="checkbox" checked={form.isCopd} onChange={(e) => setForm({...form, isCopd: e.target.checked})} />
+                ผู้ป่วย COPD
+              </label>
+            </div>
           </div>
 
           <div className="detail-card" style={{ padding: '20px 16px', marginBottom: 16 }}>
@@ -153,44 +197,50 @@ export default function PatientRegistration({ showToast }) {
             </div>
           </div>
 
+          {!isEdit && (
           <div className="detail-card" style={{ padding: '20px 16px', marginBottom: 16 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16, color: 'var(--primary-blue)', fontWeight: 'bold' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, color: 'var(--primary-blue)', fontWeight: 'bold' }}>
               <Clock size={18} />
-              <span>ตั้งเวลาประเมินรอบแรก (ชั่วโมง)</span>
+              <span>วันเวลาเริ่มกระตุ้นลุกเดิน (รอบที่ 1)</span>
             </div>
-
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <input 
-                type="number" 
-                className="form-input" 
-                value={form.reminderHours}
-                onChange={(e) => setForm({...form, reminderHours: parseInt(e.target.value) || ''})}
-                style={{ marginBottom: 0, width: '100px', textAlign: 'center', fontSize: 16, fontWeight: 'bold', color: 'var(--primary-blue)' }}
-                min="1"
-              />
-              <span style={{ fontSize: 14, color: 'var(--text-main)', fontWeight: 500 }}>ชั่วโมง</span>
-              <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>(นับจากเวลา OR Out)</span>
-            </div>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8 }}>เพิ่มรอบถัดไปหรือแก้เวลาได้ในหน้ารายละเอียดผู้ป่วย</div>
+            <input
+              type="datetime-local"
+              className="form-input"
+              value={form.firstScheduledTime}
+              onChange={(e) => setForm({...form, firstScheduledTime: e.target.value})}
+              style={{ marginBottom: 0 }}
+            />
           </div>
+          )}
 
           <div className="detail-card" style={{ padding: '20px 16px', marginBottom: 24 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16, color: 'var(--primary-blue)', fontWeight: 'bold' }}>
               <FileText size={18} />
-              <span>หมายเหตุ / ข้อจำกัด (ถ้ามี)</span>
+              <span>สาย/อุปกรณ์ ข้อจำกัด และหมายเหตุ</span>
             </div>
 
-            <textarea 
-              className="form-input" 
-              placeholder="ระบุข้อจำกัดเพิ่มเติมจากแพทย์ หรือสายยางต่างๆ..."
-              value={form.restrictionNote}
-              onChange={(e) => setForm({...form, restrictionNote: e.target.value})}
-              rows={3}
-              style={{ marginBottom: 0, resize: 'none' }}
-            />
+            {[
+              ['linesDevices', 'สายและอุปกรณ์ที่ติดอยู่กับผู้ป่วย', 'เช่น สายระบาย สายสวนปัสสาวะ'],
+              ['doctorRestriction', 'ข้อจำกัดในการลุกเดินตามคำสั่งแพทย์', 'ถ้าไม่มีเว้นว่าง'],
+              ['note', 'หมายเหตุเพิ่มเติม', ''],
+            ].map(([key, label, ph]) => (
+              <div key={key} style={{ marginBottom: 12 }}>
+                <label style={{ display: 'block', fontSize: 13, marginBottom: 4 }}>{label}</label>
+                <textarea
+                  className="form-input"
+                  placeholder={ph}
+                  value={form[key]}
+                  onChange={(e) => setForm({...form, [key]: e.target.value})}
+                  rows={2}
+                  style={{ marginBottom: 0, resize: 'none' }}
+                />
+              </div>
+            ))}
           </div>
 
           <button type="submit" className="btn btn-primary" style={{ padding: 16, fontSize: 16 }} disabled={loading}>
-            {loading ? 'กำลังบันทึก...' : 'บันทึกข้อมูลผู้ป่วยใหม่'}
+            {loading ? 'กำลังบันทึก...' : isEdit ? 'บันทึกการแก้ไข' : 'บันทึกข้อมูลผู้ป่วยใหม่'}
           </button>
           
         </form>

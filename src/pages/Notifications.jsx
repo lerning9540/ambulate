@@ -65,8 +65,9 @@ export default function Notifications({ showToast }) {
 
   const getNotifIcon = (type) => {
     switch (type) {
-      case 'INITIAL': return <Bell color="var(--primary-blue)" size={20} />;
-      case 'REMINDER': return <AlertTriangle color="var(--status-red)" size={20} />;
+      case 'DUE': return <Bell color="var(--primary-blue)" size={20} />;
+      case 'LATE': return <AlertTriangle color="var(--status-red)" size={20} />;
+      case 'INCIDENT': return <AlertTriangle color="#6f42c1" size={20} />;
       default: return <Activity color="var(--text-muted)" size={20} />;
     }
   };

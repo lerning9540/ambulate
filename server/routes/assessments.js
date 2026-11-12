@@ -1,70 +1,41 @@
 import { Router } from 'express';
-import { evaluateAssessment } from '../services/ambulation.js';
 import prisma from '../db.js';
+import { audit } from '../services/audit.js';
+import { evaluateChecklist } from '../../shared/checklist.js';
 
 const router = Router();
 
-// POST create assessment
+// POST บันทึกการประเมิน { taskId, values: { CODE: value } }
+// ระบบประเมินผลเองจากเกณฑ์ในตาราง ChecklistItem (พยาบาลไม่ต้องเลือกผลเอง)
 router.post('/', async (req, res) => {
   try {
-    const { patientId, systolicBP, diastolicBP, heartRate, temperature, painScore,
-            noDizziness, noActiveBleeding, isConscious, noOrthostatic, drainSecure, noDoctorRestriction } = req.body;
+    const { taskId, values = {} } = req.body;
+    const task = await prisma.ambulationTask.findUnique({ where: { id: taskId || '' }, include: { patient: true, record: true } });
+    if (!task) return res.status(404).json({ error: 'ไม่พบกิจกรรม' });
+    if (task.record) return res.status(400).json({ error: 'รอบนี้บันทึกผลการเดินแล้ว' });
 
-    if (!patientId) {
-      return res.status(400).json({ error: 'กรุณาระบุ patientId' });
+    const items = await prisma.checklistItem.findMany({ where: { active: true }, orderBy: [{ groupNo: 'asc' }, { sortOrder: 'asc' }] });
+    const evaluation = evaluateChecklist(items, values, task.patient.isCopd);
+    if (!evaluation.complete) {
+      return res.status(400).json({ error: `กรุณากรอกให้ครบ: ${evaluation.missing.join(', ')}` });
     }
-
-    // Evaluate assessment
-    const evaluation = evaluateAssessment({
-      systolicBP: parseInt(systolicBP),
-      heartRate: parseInt(heartRate),
-      temperature: parseFloat(temperature),
-      painScore: parseInt(painScore),
-      noDizziness: Boolean(noDizziness),
-      noActiveBleeding: Boolean(noActiveBleeding),
-      isConscious: Boolean(isConscious),
-      noOrthostatic: Boolean(noOrthostatic),
-      drainSecure: Boolean(drainSecure),
-      noDoctorRestriction: Boolean(noDoctorRestriction),
-    });
 
     const assessment = await prisma.assessment.create({
       data: {
-        patientId,
-        systolicBP: parseInt(systolicBP),
-        diastolicBP: parseInt(diastolicBP),
-        heartRate: parseInt(heartRate),
-        temperature: parseFloat(temperature),
-        painScore: parseInt(painScore),
-        noDizziness: Boolean(noDizziness),
-        noActiveBleeding: Boolean(noActiveBleeding),
-        isConscious: Boolean(isConscious),
-        noOrthostatic: Boolean(noOrthostatic),
-        drainSecure: Boolean(drainSecure),
-        noDoctorRestriction: Boolean(noDoctorRestriction),
+        taskId,
         result: evaluation.result,
-        failedReasons: evaluation.failedReasons.length > 0 ? JSON.stringify(evaluation.failedReasons) : null,
-      }
+        failedReasons: evaluation.failed,
+        answers: evaluation.answers,
+        isCopd: task.patient.isCopd,
+        assessedById: req.user.id,
+        assessedByName: req.user.name,
+      },
     });
-
+    await audit(req, 'CREATE', 'Assessment', assessment.id, { taskId, result: assessment.result });
     res.status(201).json(assessment);
   } catch (error) {
     console.error('Error creating assessment:', error);
     res.status(500).json({ error: 'ไม่สามารถบันทึกการประเมินได้' });
-  }
-});
-
-// GET assessments by patient
-router.get('/patient/:patientId', async (req, res) => {
-  try {
-    const assessments = await prisma.assessment.findMany({
-      where: { patientId: req.params.patientId },
-      orderBy: { assessedAt: 'desc' }
-    });
-    res.json(assessments);
-  } catch (error) {
-    console.error('Error fetching assessments:', error);
-    res.status(500).json({ error: 'ไม่สามารถดึงข้อมูลการประเมินได้' });
   }
 });
 

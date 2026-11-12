@@ -1,70 +1,35 @@
-import { PrismaClient } from '@prisma/client';
-import { PrismaPg } from '@prisma/adapter-pg';
-import pg from 'pg';
-import 'dotenv/config';
+// ใส่เกณฑ์ Checklist ตั้งต้นตามตารางของโรงพยาบาล (รันซ้ำได้ ไม่ทับค่าที่หัวหน้าเวรแก้ไว้)
+// ใช้: npm run db:seed
+import prisma from './db.js';
 
-const connectionString = process.env.DATABASE_URL;
-const pool = new pg.Pool({ connectionString });
-const adapter = new PrismaPg(pool);
-const prisma = new PrismaClient({ adapter });
-
-const names = [
-  "สมใจ ใจดี", "สมชาย ชาตรี", "สมหญิง รักเรียน", 
-  "กมลรัตน์ จิตดี", "วิชัย ว่องไว", "ปราณี มีสุข",
-  "นพดล คนขยัน", "ดารณี สีทอง", "ณรงค์ จงรัก",
-  "สุนทรี สีสวย"
+const G1 = 'สัญญาณชีพปกติ';
+const items = [
+  { code: 'TEMP', groupNo: 1, groupLabel: G1, label: 'อุณหภูมิ', kind: 'NUMBER', unit: '°C', minValue: 36, maxValue: 38, sortOrder: 1 },
+  { code: 'SBP', groupNo: 1, groupLabel: G1, label: 'SBP (ความดันตัวบน)', kind: 'NUMBER', unit: 'mmHg', minValue: 90, maxValue: 180, sortOrder: 2 },
+  { code: 'DBP', groupNo: 1, groupLabel: G1, label: 'DBP (ความดันตัวล่าง)', kind: 'NUMBER', unit: 'mmHg', sortOrder: 3, description: 'ใช้คำนวณ MAP' },
+  { code: 'MAP', groupNo: 1, groupLabel: G1, label: 'MAP (คำนวณอัตโนมัติ)', kind: 'MAP', unit: 'mmHg', minValue: 60, minInclusive: true, maxValue: 110, sortOrder: 4 },
+  { code: 'HR', groupNo: 1, groupLabel: G1, label: 'HR', kind: 'NUMBER', unit: 'ครั้ง/นาที', minValue: 40, maxValue: 120, sortOrder: 5 },
+  { code: 'RR', groupNo: 1, groupLabel: G1, label: 'RR', kind: 'NUMBER', unit: 'ครั้ง/นาที', maxValue: 35, sortOrder: 6 },
+  { code: 'SPO2', groupNo: 1, groupLabel: G1, label: 'O₂ Sat', kind: 'NUMBER', unit: '%', minValue: 95, minInclusive: true, copdMinValue: 92, sortOrder: 7, description: 'ผู้ป่วย COPD ใช้เกณฑ์ ≥ 92%' },
+  { code: 'NO_CONFUSION', groupNo: 2, groupLabel: 'ไม่มีอาการสับสนหรือก้าวร้าวรุนแรง', label: 'ไม่มีอาการสับสนหรือก้าวร้าวรุนแรง', kind: 'BOOL', description: 'ต้องไม่มีอาการทั้งสองลักษณะ' },
+  { code: 'NO_CHEST_PAIN', groupNo: 3, groupLabel: 'ไม่มีอาการแน่นหน้าอก หรือ EKG ปกติ', label: 'ไม่มีอาการแน่นหน้าอก หรือ EKG ปกติ', kind: 'BOOL' },
+  { code: 'PAIN', groupNo: 4, groupLabel: 'ระดับความปวด', label: 'Pain score', kind: 'NUMBER', unit: '/10', minValue: 0, minInclusive: true, maxValue: 3, maxInclusive: true, description: 'ไม่เกิน 3/10' },
+  { code: 'DRAIN', groupNo: 5, groupLabel: 'สายระบาย', label: 'ไม่มีสายระบายที่เป็นอุปสรรคต่อการเคลื่อนไหว', kind: 'BOOL' },
+  { code: 'WOUND', groupNo: 6, groupLabel: 'แผลผ่าตัดและผลเลือด', label: 'แผลไม่มีเลือดซึมผิดปกติ หรือ Hct ≥ 25% หรือ Plt > 20,000', kind: 'BOOL' },
+  { code: 'CAP_REFILL', groupNo: 7, groupLabel: 'การไหลเวียนเลือดที่ปลายนิ้ว', label: 'Capillary refill time', kind: 'NUMBER', unit: 'วินาที', maxValue: 3 },
+  { code: 'NO_ORTHOSTATIC', groupNo: 8, groupLabel: 'อาการผิดปกติเมื่อเปลี่ยนท่า', label: 'ไม่มีวิงเวียน บ้านหมุน หน้ามืด ใจสั่น หรือหายใจหอบเหนื่อยผิดปกติ', kind: 'BOOL' },
 ];
 
 async function main() {
-  console.log("Seeding 10 mock patients...");
-  
-  const now = new Date();
-  const patients = [];
-
-  for (let i = 0; i < 10; i++) {
-    const an = `123456${String(i).padStart(2, '0')}`;
-    // Randomize status for the dashboard
-    let status = 'PENDING';
-    if (i < 2) status = 'DUE'; // 2 patients DUE
-    else if (i < 5) status = 'COMPLETED'; // 3 patients COMPLETED
-    else if (i === 5) status = 'OVERDUE'; // 1 patient OVERDUE
-
-    // Assign scheduledAt dynamically based on status
-    let scheduledAt = new Date(now);
-    if (status === 'DUE') scheduledAt.setMinutes(now.getMinutes() - 10);
-    else if (status === 'OVERDUE') scheduledAt.setMinutes(now.getMinutes() - 60);
-    else if (status === 'PENDING') scheduledAt.setMinutes(now.getMinutes() + 120);
-    else scheduledAt.setMinutes(now.getMinutes() - 200);
-
-    const patient = await prisma.patient.upsert({
-      where: { an },
-      update: {},
-      create: {
-        an,
-        name: names[i],
-        age: Math.floor(Math.random() * 40) + 30, // 30-70
-        gender: Math.random() > 0.5 ? 'M' : 'F',
-        surgeryType: 'Appendectomy',
-        orDischargeAt: new Date(now.getTime() - 8 * 60 * 60 * 1000), // 8 hours ago
-        reminderHours: 6,
-        scheduledAt,
-        status,
-        useLaxative: false,
-        usePainMed: true,
-        hasRestriction: false
-      }
-    });
-    patients.push(patient);
+  for (const item of items) {
+    await prisma.checklistItem.upsert({ where: { code: item.code }, update: {}, create: item });
   }
-
-  console.log("Mock data inserted successfully!");
+  console.log(`Checklist: ${items.length} items ready`);
 }
 
 main()
-  .catch(e => {
+  .catch((e) => {
     console.error(e);
     process.exit(1);
   })
-  .finally(async () => {
-    await prisma.$disconnect();
-  });
+  .finally(() => prisma.$disconnect());
