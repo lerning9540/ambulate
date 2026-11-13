@@ -249,6 +249,9 @@ body {
 .summary-card.time { background-color: var(--status-time-bg); color: var(--status-time-text); }
 .summary-card.pending { background-color: var(--status-pending-bg); color: var(--status-pending-text); }
 .summary-card.done { background-color: var(--status-done-bg); color: var(--status-done-text); }
+.summary-card.plan { background-color: #d0f0f0; color: #0c5460; }
+.summary-card.notready { background-color: #f8d7da; color: #842029; }
+.summary-card.followup { background-color: #ead9f7; color: #5b2c83; }
 
 .summary-card-title {
   font-size: 12px;
