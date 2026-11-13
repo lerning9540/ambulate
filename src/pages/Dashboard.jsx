@@ -48,13 +48,13 @@ export default function Dashboard() {
 
   const cards = s
     ? [
-        { label: 'ผู้ป่วยที่มีแผนลุกเดิน', value: s.patientsToday, cls: 'pending' },
+        { label: 'ผู้ป่วยที่มีแผนลุกเดิน', value: s.patientsToday, cls: 'plan' },
         { label: 'ดำเนินการเสร็จแล้ว', value: s.completed, cls: 'done' },
         { label: 'เสร็จตรงเวลา', value: s.onTime, cls: 'ready' },
         { label: 'เสร็จล่าช้า', value: s.late, cls: 'time' },
         { label: 'ยังไม่ได้ดำเนินการ', value: s.notDone, cls: 'pending', note: s.overdue ? `เกินกำหนด ${s.overdue}` : null },
-        { label: 'ผู้ป่วยยังไม่พร้อม', value: s.notReadyPatients, cls: 'time' },
-        { label: 'เหตุการณ์ต้องติดตาม', value: s.openIncidents, cls: 'done' },
+        { label: 'ผู้ป่วยยังไม่พร้อม', value: s.notReadyPatients, cls: 'notready' },
+        { label: 'เหตุการณ์ต้องติดตาม', value: s.openIncidents, cls: 'followup' },
       ]
     : [];
 
