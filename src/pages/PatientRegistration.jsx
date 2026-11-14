@@ -46,12 +46,18 @@ export default function PatientRegistration({ showToast }) {
   }, [id, isEdit, showToast]);
 
   const surgeryTypes = [
-    'ผ่าตัดช่องท้อง (Abdominal)',
-    'ผ่าตัดกระดูกและข้อ (Orthopedic)',
-    'ผ่าตัดทรวงอก (Thoracic)',
-    'ผ่าตัดทางนรีเวช (Gynecological)',
+    'Appendectomy: ผ่าตัดไส้ติ่งอักเสบ',
+    'Cholecystectomy: ผ่าตัดถุงน้ำดี',
+    'Exploratory Laparotomy: ผ่าตัดเปิดสำรวจช่องท้อง',
+    'Colectomy: ผ่าตัดลำไส้ใหญ่บางส่วน',
+    'Gastrectomy: ผ่าตัดกระเพาะอาหาร',
+    'Hernioplasty: ผ่าตัดซ่อมแซมไส้เลื่อน',
     'อื่นๆ'
   ];
+  // รายการเก่าที่บันทึกไว้ก่อนเปลี่ยนตัวเลือก ให้ยังแสดงค่าเดิมได้เมื่อแก้ไข
+  const surgeryOptions = form.surgeryType && !surgeryTypes.includes(form.surgeryType)
+    ? [...surgeryTypes, form.surgeryType]
+    : surgeryTypes;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -181,7 +187,7 @@ export default function PatientRegistration({ showToast }) {
                 style={{ marginBottom: 0 }}
               >
                 <option value="">-- เลือกชนิด --</option>
-                {surgeryTypes.map(type => <option key={type} value={type}>{type}</option>)}
+                {surgeryOptions.map(type => <option key={type} value={type}>{type}</option>)}
               </select>
             </div>
 

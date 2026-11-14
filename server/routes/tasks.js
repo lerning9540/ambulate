@@ -69,4 +69,19 @@ router.put('/:id', async (req, res) => {
   }
 });
 
+// DELETE รอบลุกเดิน (ลบได้เฉพาะรอบที่ยังไม่บันทึกผล)
+router.delete('/:id', async (req, res) => {
+  try {
+    const task = await prisma.ambulationTask.findUnique({ where: { id: req.params.id }, include: { record: true } });
+    if (!task) return res.status(404).json({ error: 'ไม่พบกิจกรรม' });
+    if (task.record) return res.status(400).json({ error: 'รอบนี้บันทึกผลแล้ว ลบไม่ได้' });
+    await prisma.ambulationTask.delete({ where: { id: task.id } });
+    await audit(req, 'DELETE', 'AmbulationTask', task.id, { patientId: task.patientId, roundNo: task.roundNo, scheduledAt: task.scheduledAt });
+    res.json({ message: 'ลบรอบลุกเดินแล้ว' });
+  } catch (error) {
+    console.error('Error deleting task:', error);
+    res.status(500).json({ error: 'ไม่สามารถลบรอบได้' });
+  }
+});
+
 export default router;

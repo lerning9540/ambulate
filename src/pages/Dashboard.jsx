@@ -8,6 +8,17 @@ import { Search } from 'lucide-react';
 // กลุ่มสถานะบน Dashboard (spec ข้อ 7.2) ผู้ป่วย 1 คนอยู่ได้หลายกลุ่ม
 const GROUPS = ['OVERDUE', 'DUE', 'NOT_READY', 'READY', 'FOLLOW_UP', 'UPCOMING', 'COMPLETED_LATE', 'COMPLETED_ON_TIME'];
 
+// ตัวกรองเมื่อกดการ์ดสรุป (null = แสดงเฉพาะเหตุการณ์ที่ต้องติดตาม)
+const CARD_FILTERS = {
+  plan: () => true,
+  done: (t) => t.status.startsWith('COMPLETED'),
+  onTime: (t) => t.status === 'COMPLETED_ON_TIME',
+  late: (t) => t.status === 'COMPLETED_LATE',
+  notDone: (t) => !t.status.startsWith('COMPLETED'),
+  notReady: (t) => t.readiness === 'NOT_READY',
+  followup: null,
+};
+
 function inGroup(task, group) {
   if (group === 'READY' || group === 'NOT_READY') return task.readiness === group;
   return task.status === group;
@@ -18,6 +29,7 @@ export default function Dashboard() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState('');
+  const [activeCard, setActiveCard] = useState(null);
 
   const fetchData = useCallback(async () => {
     try {
@@ -43,18 +55,23 @@ export default function Dashboard() {
 
   const s = data?.summary;
   const match = (p) => !q || p.an.includes(q) || p.name.includes(q);
-  const tasks = (data?.tasks || []).filter((t) => match(t.patient));
-  const incidents = (data?.incidents || []).filter((i) => match(i.patient));
+  const cardFilter = activeCard ? CARD_FILTERS[activeCard] : undefined;
+  let tasks = (data?.tasks || []).filter((t) => match(t.patient));
+  let incidents = (data?.incidents || []).filter((i) => match(i.patient));
+  if (activeCard) {
+    tasks = cardFilter ? tasks.filter(cardFilter) : [];
+    incidents = activeCard === 'followup' ? incidents : [];
+  }
 
   const cards = s
     ? [
-        { label: 'ผู้ป่วยที่มีแผนลุกเดิน', value: s.patientsToday, cls: 'plan' },
-        { label: 'ดำเนินการเสร็จแล้ว', value: s.completed, cls: 'done' },
-        { label: 'เสร็จตรงเวลา', value: s.onTime, cls: 'ready' },
-        { label: 'เสร็จล่าช้า', value: s.late, cls: 'time' },
-        { label: 'ยังไม่ได้ดำเนินการ', value: s.notDone, cls: 'pending', note: s.overdue ? `เกินกำหนด ${s.overdue}` : null },
-        { label: 'ผู้ป่วยยังไม่พร้อม', value: s.notReadyPatients, cls: 'notready' },
-        { label: 'เหตุการณ์ต้องติดตาม', value: s.openIncidents, cls: 'followup' },
+        { label: 'ผู้ป่วยที่มีแผนลุกเดิน', value: s.patientsToday, cls: 'plan', filter: 'plan' },
+        { label: 'ดำเนินการเสร็จแล้ว', value: s.completed, cls: 'done', filter: 'done' },
+        { label: 'เสร็จตรงเวลา', value: s.onTime, cls: 'ready', filter: 'onTime' },
+        { label: 'เสร็จล่าช้า', value: s.late, cls: 'time', filter: 'late' },
+        { label: 'ยังไม่ได้ดำเนินการ', value: s.notDone, cls: 'pending', note: s.overdue ? `เกินกำหนด ${s.overdue}` : null, filter: 'notDone' },
+        { label: 'ผู้ป่วยยังไม่พร้อม', value: s.notReadyPatients, cls: 'notready', filter: 'notReady' },
+        { label: 'เหตุการณ์ต้องติดตาม', value: s.openIncidents, cls: 'followup', filter: 'followup' },
       ]
     : [];
 
@@ -76,13 +93,28 @@ export default function Dashboard() {
         <h2 className="section-title">สรุปกิจกรรมประจำวัน</h2>
         <div className="summary-grid">
           {cards.map((c) => (
-            <div key={c.label} className={`summary-card ${c.cls}`}>
+            <div
+              key={c.label}
+              className={`summary-card ${c.cls}`}
+              role="button"
+              tabIndex={0}
+              onClick={() => setActiveCard(activeCard === c.filter ? null : c.filter)}
+              onKeyDown={(e) => e.key === 'Enter' && setActiveCard(activeCard === c.filter ? null : c.filter)}
+              style={{ cursor: 'pointer', outline: activeCard === c.filter ? '2px solid var(--primary-blue)' : 'none' }}
+            >
               <div className="summary-card-title">{c.label}</div>
               <div className="summary-card-value">{c.value}</div>
               {c.note && <div style={{ fontSize: 11, color: 'var(--status-red)', fontWeight: 600 }}>{c.note}</div>}
             </div>
           ))}
         </div>
+
+        {activeCard && (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 13, marginBottom: 12, color: 'var(--text-muted)' }}>
+            <span>แสดงเฉพาะ: {cards.find((c) => c.filter === activeCard)?.label}</span>
+            <button className="btn" style={{ width: 'auto', padding: '4px 12px', fontSize: 13 }} onClick={() => setActiveCard(null)}>ดูทั้งหมด</button>
+          </div>
+        )}
 
         {loading && !data ? (
           <div style={{ textAlign: 'center', padding: 20, color: 'var(--text-muted)' }}>กำลังโหลดข้อมูล...</div>
