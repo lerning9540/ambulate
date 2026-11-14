@@ -32,6 +32,7 @@ model Patient {
   doctorRestriction String?                    // ข้อจำกัดการลุกเดินตามคำสั่งแพทย์
   note              String?                    // หมายเหตุเพิ่มเติม
   isCopd            Boolean  @default(false)   // ผู้ป่วย COPD (ใช้เกณฑ์ SpO2 >= 92%)
+  dischargedHomeAt  DateTime?                  // วันเวลาที่กลับบ้านแล้ว (null = ยังไม่กลับบ้าน)
   createdById       String?
   updatedById       String?
   createdAt         DateTime @default(now())

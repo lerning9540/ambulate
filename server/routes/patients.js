@@ -24,6 +24,7 @@ function pickPatientFields(body) {
   if (body.doctorRestriction !== undefined) data.doctorRestriction = body.doctorRestriction || null;
   if (body.note !== undefined) data.note = body.note || null;
   if (body.isCopd !== undefined) data.isCopd = Boolean(body.isCopd);
+  if (body.dischargedHomeAt !== undefined) data.dischargedHomeAt = body.dischargedHomeAt ? new Date(body.dischargedHomeAt) : null;
   return data;
 }
 
@@ -34,6 +35,7 @@ function validatePatient(data, isCreate) {
   if (isCreate && (!data.name || !data.surgeryType || !data.orDischargeAt)) return 'กรุณากรอกข้อมูลสำคัญให้ครบถ้วน';
   if (data.age !== undefined && (!Number.isInteger(data.age) || data.age < 0 || data.age > 130)) return 'อายุไม่ถูกต้อง';
   if (data.orDischargeAt !== undefined && Number.isNaN(data.orDischargeAt.getTime())) return 'เวลาออกจากห้องผ่าตัดไม่ถูกต้อง';
+  if (data.dischargedHomeAt instanceof Date && Number.isNaN(data.dischargedHomeAt.getTime())) return 'วันเวลาที่กลับบ้านไม่ถูกต้อง';
   return null;
 }
 

@@ -55,6 +55,17 @@ export default function PatientDetail({ showToast }) {
     }
   };
 
+  const setDischarged = async (value) => {
+    if (value && !window.confirm(`ยืนยันว่าผู้ป่วย ${patient.name} กลับบ้านแล้ว?`)) return;
+    try {
+      await patientAPI.update(id, { dischargedHomeAt: value ? new Date().toISOString() : null });
+      showToast(value ? 'บันทึกว่าผู้ป่วยกลับบ้านแล้ว' : 'ยกเลิกสถานะกลับบ้านแล้ว');
+      load();
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  };
+
   const saveTime = async () => {
     try {
       await taskAPI.reschedule(editing.taskId, new Date(editing.value).toISOString());
@@ -151,6 +162,15 @@ export default function PatientDetail({ showToast }) {
                 </div>
               ))}
           </div>
+        )}
+
+        {patient.dischargedHomeAt ? (
+          <div className="detail-card" style={{ padding: 12, marginBottom: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, background: '#e8f5e9' }}>
+            <span style={{ color: '#1b5e20', fontWeight: 600, fontSize: 14 }}>กลับบ้านแล้ว · {fmtDateTime(patient.dischargedHomeAt)} น.</span>
+            <button className="btn" style={{ width: 'auto', padding: '4px 12px', fontSize: 13 }} onClick={() => setDischarged(false)}>ยกเลิก</button>
+          </div>
+        ) : (
+          <button className="btn" style={{ marginBottom: 12 }} onClick={() => setDischarged(true)}>ผู้ป่วยกลับบ้านแล้ว</button>
         )}
 
         <h2 className="section-title">ตารางการลุกเดิน</h2>
