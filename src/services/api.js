@@ -52,6 +52,7 @@ export const taskAPI = {
   getById: (id) => fetchAPI(`/tasks/${id}`),
   create: (data) => fetchAPI('/tasks', json('POST', data)),
   reschedule: (id, scheduledAt) => fetchAPI(`/tasks/${id}`, json('PUT', { scheduledAt })),
+  delete: (id) => fetchAPI(`/tasks/${id}`, { method: 'DELETE' }),
 };
 
 export const assessmentAPI = {

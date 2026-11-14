@@ -4,7 +4,7 @@ import { patientAPI, taskAPI, incidentAPI } from '../services/api';
 import Header from '../components/Header';
 import { useAuth } from '../context/AuthContext';
 import { StatusPill, fmtDateTime, toLocalInput } from '../lib/status';
-import { User, Plus, Pencil } from 'lucide-react';
+import { User, Plus, Pencil, Trash2 } from 'lucide-react';
 
 export default function PatientDetail({ showToast }) {
   const { id } = useParams();
@@ -38,6 +38,17 @@ export default function PatientDetail({ showToast }) {
       await taskAPI.create({ patientId: id, scheduledAt: new Date(newTime).toISOString() });
       setNewTime('');
       showToast('เพิ่มรอบลุกเดินแล้ว');
+      load();
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  };
+
+  const deleteRound = async (t) => {
+    if (!window.confirm(`ลบรอบที่ ${t.roundNo} (${fmtDateTime(t.scheduledAt)} น.) ?`)) return;
+    try {
+      await taskAPI.delete(t.id);
+      showToast('ลบรอบลุกเดินแล้ว');
       load();
     } catch (err) {
       showToast(err.message, 'error');
@@ -150,7 +161,12 @@ export default function PatientDetail({ showToast }) {
             <div key={t.id} className="schedule-card" style={{ marginBottom: 12 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, gap: 8 }}>
                 <span className="schedule-title" style={{ margin: 0 }}>รอบที่ {t.roundNo}</span>
-                <StatusPill status={t.status} small />
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <StatusPill status={t.status} small />
+                  {!t.record && (
+                    <Trash2 size={16} title="ลบรอบนี้" style={{ cursor: 'pointer', color: 'var(--status-red)' }} onClick={() => deleteRound(t)} />
+                  )}
+                </div>
               </div>
 
               {editing?.taskId === t.id ? (
@@ -260,11 +276,9 @@ export default function PatientDetail({ showToast }) {
           </div>
         )}
 
-        {user?.role === 'HEAD_NURSE' && (
-          <button className="btn btn-danger" style={{ marginTop: 8 }} onClick={deletePatient}>
-            ลบผู้ป่วย (หัวหน้าเวร)
-          </button>
-        )}
+        <button className="btn btn-danger" style={{ marginTop: 8 }} onClick={deletePatient}>
+          ลบรายชื่อผู้ป่วย
+        </button>
       </div>
     </>
   );

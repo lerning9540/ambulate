@@ -1,7 +1,6 @@
 import { Router } from 'express';
 import prisma from '../db.js';
 import { audit } from '../services/audit.js';
-import { requireHeadNurse } from '../middleware/auth.js';
 import { decorateTask, bangkokDayRange, todayBangkok } from '../services/status.js';
 
 const router = Router();
@@ -298,8 +297,8 @@ router.put('/:id', async (req, res) => {
   }
 });
 
-// DELETE ผู้ป่วย (เฉพาะหัวหน้าเวร)
-router.delete('/:id', requireHeadNurse, async (req, res) => {
+// DELETE ผู้ป่วย (พยาบาลทุกคนลบได้)
+router.delete('/:id', async (req, res) => {
   try {
     const p = await prisma.patient.delete({ where: { id: req.params.id } });
     await audit(req, 'DELETE', 'Patient', p.id, { an: p.an, name: p.name });
