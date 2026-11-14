@@ -9,6 +9,8 @@ import AmbulationRecord from './pages/AmbulationRecord';
 import Notifications from './pages/Notifications';
 import Reports from './pages/Reports';
 import Settings from './pages/Settings';
+import Privacy from './pages/Privacy';
+import Help from './pages/Help';
 import Login from './pages/Login';
 import RegisterNurse from './pages/RegisterNurse';
 import PatientList from './pages/PatientList';
@@ -119,6 +121,8 @@ const AppContent = () => {
           <Route path="/notifications" element={<ProtectedRoute><Notifications showToast={showToast} /></ProtectedRoute>} />
           <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
           <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+          <Route path="/privacy" element={<ProtectedRoute><Privacy /></ProtectedRoute>} />
+          <Route path="/help" element={<ProtectedRoute><Help /></ProtectedRoute>} />
         </Routes>
       </div>
 

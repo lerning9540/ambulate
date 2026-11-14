@@ -59,21 +59,21 @@ export default function Settings() {
             </label>
           </div>
           
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px', borderBottom: '1px solid var(--border-color)' }}>
+          <Link to="/privacy" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px', borderBottom: '1px solid var(--border-color)', color: 'inherit', textDecoration: 'none' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
               <Shield size={20} color="var(--primary-blue)" />
               <span style={{ fontSize: 14, fontWeight: 500 }}>ความเป็นส่วนตัว</span>
             </div>
             <span style={{ color: 'var(--text-muted)' }}>&gt;</span>
-          </div>
+          </Link>
 
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px' }}>
+          <Link to="/help" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px', color: 'inherit', textDecoration: 'none' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
               <HelpCircle size={20} color="var(--primary-blue)" />
               <span style={{ fontSize: 14, fontWeight: 500 }}>ช่วยเหลือและสนับสนุน</span>
             </div>
             <span style={{ color: 'var(--text-muted)' }}>&gt;</span>
-          </div>
+          </Link>
         </div>
 
         {user?.role === 'HEAD_NURSE' && (
