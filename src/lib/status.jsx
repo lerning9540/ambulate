@@ -11,6 +11,7 @@ export const STATUS = {
   COMPLETED_LATE: { label: 'เสร็จล่าช้า', en: 'COMPLETED LATE', color: '#856404', bg: '#fff3cd' },
   OVERDUE: { label: 'เกินกำหนด', en: 'OVERDUE', color: '#ffffff', bg: '#dc3545' },
   FOLLOW_UP: { label: 'ต้องติดตาม', en: 'FOLLOW-UP', color: '#6f42c1', bg: '#ece3fa' },
+  AFTER_DISCHARGE: { label: 'ไม่ต้องติดตาม · กลับบ้านแล้ว', en: 'DISCHARGED', color: '#495057', bg: '#e9ecef' },
 };
 
 export function StatusPill({ status, small }) {

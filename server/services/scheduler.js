@@ -1,5 +1,5 @@
 import prisma from '../db.js';
-import { LATE_AFTER_MS } from './status.js';
+import { LATE_AFTER_MS, isAfterDischarge } from './status.js';
 
 // แจ้งเตือนตาม spec ข้อ 4 และคำสั่งเพิ่มเติม (เตือนทุก 30 นาที)
 // - ถึงเวลา: แจ้ง 1 ครั้ง
@@ -28,7 +28,7 @@ export async function checkAndNotify() {
       where: { record: null, dueNotifiedAt: null, scheduledAt: { lte: now } },
       include: { patient: true },
     });
-    for (const task of dueTasks) {
+    for (const task of dueTasks.filter((t) => !isAfterDischarge(t, t.patient.dischargedHomeAt))) {
       await prisma.$transaction([
         prisma.notification.create({
           data: {
@@ -54,7 +54,7 @@ export async function checkAndNotify() {
       },
       include: { patient: true },
     });
-    for (const task of repeatTasks) {
+    for (const task of repeatTasks.filter((t) => !isAfterDischarge(t, t.patient.dischargedHomeAt))) {
       const last = await prisma.notification.findFirst({
         where: { taskId: task.id },
         orderBy: { sentAt: 'desc' },
@@ -78,7 +78,7 @@ export async function checkAndNotify() {
       },
       include: { patient: true },
     });
-    for (const task of lateTasks) {
+    for (const task of lateTasks.filter((t) => !isAfterDischarge(t, t.patient.dischargedHomeAt))) {
       await prisma.$transaction([
         prisma.notification.create({
           data: {
