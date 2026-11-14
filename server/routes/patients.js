@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import prisma from '../db.js';
 import { audit } from '../services/audit.js';
-import { decorateTask, bangkokDayRange, todayBangkok } from '../services/status.js';
+import { decorateTask, bangkokDayRange, todayBangkok, isAfterDischarge } from '../services/status.js';
 
 const router = Router();
 
@@ -55,7 +55,7 @@ router.get('/', async (req, res) => {
     const now = new Date();
     res.json(
       patients.map((p) => {
-        const tasks = p.tasks.map((t) => decorateTask(t, now));
+        const tasks = p.tasks.map((t) => decorateTask(t, now, p.dischargedHomeAt));
         const next = tasks.find((t) => !t.record) || null;
         return {
           ...p,
@@ -94,7 +94,7 @@ router.get('/dashboard', async (req, res) => {
     ]);
 
     const now = new Date();
-    const tasks = tasksRaw.map((t) => {
+    const tasks = tasksRaw.filter((t) => !isAfterDischarge(t, t.patient.dischargedHomeAt)).map((t) => {
       const d = decorateTask(t, now);
       return {
         id: d.id,
@@ -143,10 +143,10 @@ router.get('/reports', async (req, res) => {
 
     const tasksRaw = await prisma.ambulationTask.findMany({
       where: { scheduledAt: { gte: fromRange.start, lt: toRange.end } },
-      include: { ...taskInclude, patient: { select: { id: true, orDischargeAt: true } } },
+      include: { ...taskInclude, patient: { select: { id: true, orDischargeAt: true, dischargedHomeAt: true } } },
     });
     const now = new Date();
-    const tasks = tasksRaw.map((t) => decorateTask(t, now));
+    const tasks = tasksRaw.filter((t) => !isAfterDischarge(t, t.patient.dischargedHomeAt)).map((t) => decorateTask(t, now));
     const completed = tasks.filter((t) => t.record);
     const onTime = tasks.filter((t) => t.status === 'COMPLETED_ON_TIME');
 
@@ -227,7 +227,7 @@ router.get('/:id', async (req, res) => {
       createdByName: nameOf[patient.createdById] || null,
       updatedByName: nameOf[patient.updatedById] || null,
       tasks: patient.tasks.map((t) => ({
-        ...decorateTask(t, now),
+        ...decorateTask(t, now, patient.dischargedHomeAt),
         scheduleChanges: t.scheduleChanges.map((c) => ({ ...c, changedByName: nameOf[c.changedById] || null })),
       })),
     });

@@ -9,11 +9,17 @@ export function lateAt(task) {
   return new Date(new Date(task.scheduledAt).getTime() + LATE_AFTER_MS);
 }
 
+// รอบที่อยู่หลังวันที่ผู้ป่วยกลับบ้าน และยังไม่บันทึกผล = ไม่ต้องติดตามแล้ว
+export function isAfterDischarge(task, dischargedHomeAt) {
+  return !task.record && !!dischargedHomeAt && new Date(task.scheduledAt) > new Date(dischargedHomeAt);
+}
+
 // สถานะหลักของกิจกรรม
-export function taskStatus(task, now = new Date()) {
+export function taskStatus(task, now = new Date(), dischargedHomeAt = task.patient?.dischargedHomeAt) {
   if (task.record) {
     return new Date(task.record.startTime) < lateAt(task) ? 'COMPLETED_ON_TIME' : 'COMPLETED_LATE';
   }
+  if (isAfterDischarge(task, dischargedHomeAt)) return 'AFTER_DISCHARGE';
   if (now < new Date(task.scheduledAt)) return 'UPCOMING';
   if (now >= lateAt(task)) return 'OVERDUE';
   return 'DUE';
@@ -26,8 +32,8 @@ export function readiness(task) {
   return latest.result;
 }
 
-export function decorateTask(task, now = new Date()) {
-  return { ...task, status: taskStatus(task, now), readiness: readiness(task) };
+export function decorateTask(task, now = new Date(), dischargedHomeAt = task.patient?.dischargedHomeAt) {
+  return { ...task, status: taskStatus(task, now, dischargedHomeAt), readiness: readiness(task) };
 }
 
 // ช่วงวันที่ตามเวลาไทย
