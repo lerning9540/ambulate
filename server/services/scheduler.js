@@ -1,11 +1,15 @@
 import prisma from '../db.js';
 import { LATE_AFTER_MS } from './status.js';
 
-// แจ้งเตือนตาม spec ข้อ 4
+// แจ้งเตือนตาม spec ข้อ 4 และคำสั่งเพิ่มเติม (เตือนทุก 30 นาที)
 // - ถึงเวลา: แจ้ง 1 ครั้ง
-// - เกิน 1 ชม. ยังไม่บันทึกผล: แจ้งซ้ำ 1 ครั้ง (สถานะเป็น Late/OVERDUE)
+// - ยังไม่บันทึกผล: เตือนซ้ำทุก 30 นาที (หยุดเตือนหลัง 24 ชม. จากเวลาที่กำหนด เพื่อไม่ให้เตือนค้างข้ามเดือน)
+// - เกิน 1 ชม. ยังไม่บันทึกผล: แจ้งล่าช้า (Late/OVERDUE) 1 ครั้ง
 // - บันทึกผลแล้ว: ไม่แจ้งอีก
 // หมายเหตุ: Render แผนฟรีจะหลับเมื่อไม่มีคนใช้ จึงเรียก checkAndNotify ทุกครั้งที่มี request ด้วย (สูงสุด 1 ครั้ง/20 วินาที)
+
+const REPEAT_EVERY_MS = 30 * 60 * 1000;
+const REPEAT_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 let running = false;
 let lastRun = 0;
@@ -39,6 +43,31 @@ export async function checkAndNotify() {
           data: { dueNotifiedAt: now },
         }),
       ]);
+    }
+
+    // เตือนซ้ำทุก 30 นาที จนกว่าจะบันทึกผล (ไม่เตือนเกิน 24 ชม. หลังเวลาที่กำหนด)
+    const repeatTasks = await prisma.ambulationTask.findMany({
+      where: {
+        record: null,
+        dueNotifiedAt: { not: null },
+        scheduledAt: { gte: new Date(now.getTime() - REPEAT_WINDOW_MS), lte: new Date(now.getTime() - REPEAT_EVERY_MS) },
+      },
+      include: { patient: true },
+    });
+    for (const task of repeatTasks) {
+      const last = await prisma.notification.findFirst({
+        where: { taskId: task.id },
+        orderBy: { sentAt: 'desc' },
+      });
+      if (last && now.getTime() - new Date(last.sentAt).getTime() < REPEAT_EVERY_MS) continue;
+      await prisma.notification.create({
+        data: {
+          patientId: task.patientId,
+          taskId: task.id,
+          type: 'DUE',
+          message: `เตือนซ้ำ: กระตุ้นลุกเดิน ${task.patient.name} (AN: ${task.patient.an}) รอบที่ ${task.roundNo} เวลา ${fmtTime(task.scheduledAt)} น. ยังไม่บันทึกผล`,
+        },
+      });
     }
 
     const lateTasks = await prisma.ambulationTask.findMany({

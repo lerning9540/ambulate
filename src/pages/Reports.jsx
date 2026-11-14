@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import Header from '../components/Header';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { patientAPI } from '../services/api';
 import { todayLocal } from '../lib/status';
 
@@ -38,7 +38,12 @@ export default function Reports() {
     <>
       <Header 
         title="รายงานสถิติ" 
-        showBack={true} 
+        showBack={true}
+        rightElement={
+          <button className="no-print" onClick={() => window.print()} title="ดาวน์โหลด PDF" style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', fontSize: 13 }}>
+            PDF
+          </button>
+        }
 
       />
       
@@ -85,6 +90,27 @@ export default function Reports() {
                       <YAxis tick={{ fontSize: 12 }} axisLine={false} tickLine={false} ticks={[0, 50, 100]} />
                       <Tooltip cursor={{ fill: '#f1f5f9' }} />
                       <Bar dataKey="rate" fill="var(--primary-blue)" radius={[4, 4, 0, 0]} barSize={16} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              ) : (
+                <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>ยังไม่มีข้อมูลลุกเดินสำหรับพล็อตกราฟ</div>
+              )}
+            </div>
+
+            <div className="chart-card">
+              <div className="chart-title">จำนวนกิจกรรมรายวัน แยกตามสถานะ</div>
+              {data.chartData && data.chartData.length > 0 ? (
+                <div style={{ width: '100%', height: 260 }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={data.chartData} margin={{ top: 10, right: 0, left: -25, bottom: 0 }}>
+                      <XAxis dataKey="day" tick={{ fontSize: 12 }} axisLine={false} tickLine={false} />
+                      <YAxis tick={{ fontSize: 12 }} axisLine={false} tickLine={false} allowDecimals={false} />
+                      <Tooltip cursor={{ fill: '#f1f5f9' }} />
+                      <Legend wrapperStyle={{ fontSize: 12 }} />
+                      <Bar dataKey="onTime" name="ตรงเวลา" fill="#28a745" radius={[4, 4, 0, 0]} barSize={8} />
+                      <Bar dataKey="late" name="ล่าช้า" fill="#d97706" radius={[4, 4, 0, 0]} barSize={8} />
+                      <Bar dataKey="notDone" name="ยังไม่ได้ดำเนินการ" fill="#004085" radius={[4, 4, 0, 0]} barSize={8} />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>

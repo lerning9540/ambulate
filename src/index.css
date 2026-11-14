@@ -615,3 +615,10 @@ body {
   from { transform: translateY(-20px); opacity: 0; }
   to { transform: translateY(0); opacity: 1; }
 }
+
+/* Print / save as PDF: hide navigation and controls, keep report content */
+@media print {
+  .bottom-nav, .app-header, .no-print, .date-picker { display: none !important; }
+  .page-content { padding: 0; }
+  .chart-card, .stat-box { break-inside: avoid; }
+}
