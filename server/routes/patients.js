@@ -83,7 +83,7 @@ router.get('/dashboard', async (req, res) => {
     const [tasksRaw, openIncidents] = await Promise.all([
       prisma.ambulationTask.findMany({
         where: { scheduledAt: { gte: range.start, lt: range.end } },
-        include: { ...taskInclude, patient: { select: { id: true, an: true, name: true, bed: true } } },
+        include: { ...taskInclude, patient: { select: { id: true, an: true, name: true, bed: true, dischargedHomeAt: true } } },
         orderBy: { scheduledAt: 'asc' },
       }),
       prisma.incident.findMany({
@@ -120,6 +120,7 @@ router.get('/dashboard', async (req, res) => {
         notDone: tasks.length - completed.length,
         overdue: tasks.filter((t) => t.status === 'OVERDUE').length,
         notReadyPatients: notReadyPatients.size,
+        dischargedPatients: new Set(tasks.filter((t) => t.patient.dischargedHomeAt).map((t) => t.patient.id)).size,
         openIncidents: openIncidents.length,
       },
       tasks,

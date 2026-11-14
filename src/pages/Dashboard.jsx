@@ -16,6 +16,7 @@ const CARD_FILTERS = {
   late: (t) => t.status === 'COMPLETED_LATE',
   notDone: (t) => !t.status.startsWith('COMPLETED'),
   notReady: (t) => t.readiness === 'NOT_READY',
+  discharged: (t) => !!t.patient.dischargedHomeAt,
   followup: null,
 };
 
@@ -71,6 +72,7 @@ export default function Dashboard() {
         { label: 'เสร็จล่าช้า', value: s.late, cls: 'time', filter: 'late' },
         { label: 'ยังไม่ได้ดำเนินการ', value: s.notDone, cls: 'pending', note: s.overdue ? `เกินกำหนด ${s.overdue}` : null, filter: 'notDone' },
         { label: 'ผู้ป่วยยังไม่พร้อม', value: s.notReadyPatients, cls: 'notready', filter: 'notReady' },
+        { label: 'กลับบ้านแล้ว', value: s.dischargedPatients, cls: 'discharged', filter: 'discharged' },
         { label: 'เหตุการณ์ต้องติดตาม', value: s.openIncidents, cls: 'followup', filter: 'followup' },
       ]
     : [];
