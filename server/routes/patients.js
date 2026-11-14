@@ -162,15 +162,25 @@ router.get('/reports', async (req, res) => {
     const daily = {};
     for (const t of tasks) {
       const day = new Date(new Date(t.scheduledAt).getTime() + 7 * 3600000).toISOString().slice(0, 10);
-      daily[day] = daily[day] || { total: 0, onTime: 0 };
+      daily[day] = daily[day] || { total: 0, onTime: 0, late: 0, notDone: 0 };
       daily[day].total += 1;
       if (t.status === 'COMPLETED_ON_TIME') daily[day].onTime += 1;
+      else if (t.status === 'COMPLETED_LATE') daily[day].late += 1;
+      else if (!t.record) daily[day].notDone += 1;
     }
     const chartData = Object.keys(daily)
       .sort()
       .map((d) => {
         const [, mm, dd] = d.split('-');
-        return { day: `${parseInt(dd)}/${parseInt(mm)}`, rate: Math.round((daily[d].onTime / daily[d].total) * 100) };
+        const c = daily[d];
+        return {
+          day: `${parseInt(dd)}/${parseInt(mm)}`,
+          rate: Math.round((c.onTime / c.total) * 100),
+          total: c.total,
+          onTime: c.onTime,
+          late: c.late,
+          notDone: c.notDone,
+        };
       });
 
     const pct = (a, b) => (b > 0 ? parseFloat(((a / b) * 100).toFixed(1)) : 0);
