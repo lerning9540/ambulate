@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import prisma from '../db.js';
 import { audit } from '../services/audit.js';
+import { cleanComplications, COMPLICATION_LABELS } from '../services/complications.js';
 
 const router = Router();
 
@@ -27,6 +28,11 @@ router.post('/', async (req, res) => {
     }
 
     const complication = (b.complication || '').trim();
+    const complications = cleanComplications(b.complications);
+    const complicationOther = (b.complicationOther || '').trim();
+    if (complications.includes('OTHER') && !complicationOther) {
+      return res.status(400).json({ error: 'กรุณาระบุภาวะแทรกซ้อนในช่อง อื่นๆ' });
+    }
     const record = await prisma.ambulationRecord.create({
       data: {
         taskId: task.id,
@@ -39,6 +45,8 @@ router.post('/', async (req, res) => {
         symptomsDuring: b.symptomsDuring || null,
         symptomsAfter: b.symptomsAfter || null,
         complication: complication || null,
+        complications: complications.length ? complications : undefined,
+        complicationOther: complications.includes('OTHER') ? complicationOther : null,
         stoppedEarly: Boolean(b.stoppedEarly),
         note: b.note || null,
         recordedById: req.user.id,

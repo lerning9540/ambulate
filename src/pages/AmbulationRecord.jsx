@@ -38,6 +38,41 @@ function SymptomPicker({ value, onChange }) {
   );
 }
 
+const COMPLICATION_OPTIONS = [
+  { code: 'CONSTIPATION', label: 'ท้องผูก (Constipation)' },
+  { code: 'ABDOMINAL_DISTENSION', label: 'ท้องอืด (Abdominal Distension)' },
+  { code: 'URINARY_RETENTION', label: 'ปัสสาวะคั่ง (Urinary Retention)' },
+  { code: 'ORTHOSTATIC_HYPOTENSION', label: 'ความดันโลหิตต่ำขณะเปลี่ยนท่า (Orthostatic Hypotension)' },
+  { code: 'OTHER', label: 'อื่นๆ' },
+];
+
+function ComplicationPicker({ selected, other, onChange }) {
+  const toggle = (code) => {
+    const list = selected.includes(code) ? selected.filter((x) => x !== code) : [...selected, code];
+    onChange({ selected: list, other: list.includes('OTHER') ? other : '' });
+  };
+  return (
+    <div className="checkbox-list">
+      {COMPLICATION_OPTIONS.map((o) => (
+        <label className="checkbox-item" key={o.code}>
+          <input type="checkbox" checked={selected.includes(o.code)} onChange={() => toggle(o.code)} />
+          <span>{o.label}</span>
+        </label>
+      ))}
+      {selected.includes('OTHER') && (
+        <input
+          type="text"
+          className="form-input"
+          placeholder="ระบุภาวะแทรกซ้อนอื่นๆ"
+          value={other}
+          onChange={(e) => onChange({ selected, other: e.target.value })}
+          style={{ marginBottom: 0 }}
+        />
+      )}
+    </div>
+  );
+}
+
 const symptomText = (v) => (v.none ? 'ไม่มีอาการผิดปกติ' : [...v.list, v.other.trim()].filter(Boolean).join(', '));
 
 export default function AmbulationRecord({ showToast }) {
@@ -60,6 +95,7 @@ export default function AmbulationRecord({ showToast }) {
   });
   const [during, setDuring] = useState({ none: true, list: [], other: '' });
   const [after, setAfter] = useState({ none: true, list: [], other: '' });
+  const [complicationChecks, setComplicationChecks] = useState({ selected: [], other: '' });
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -86,6 +122,8 @@ export default function AmbulationRecord({ showToast }) {
         symptomsDuring: symptomText(during),
         symptomsAfter: symptomText(after),
         complication: form.complication,
+        complications: complicationChecks.selected,
+        complicationOther: complicationChecks.other,
         stoppedEarly: form.stoppedEarly,
         note: form.note,
       });
@@ -175,6 +213,11 @@ export default function AmbulationRecord({ showToast }) {
           <div style={{ marginBottom: 16 }}>
             <Label>อาการหลังสิ้นสุดการลุกเดิน</Label>
             <SymptomPicker value={after} onChange={setAfter} />
+          </div>
+
+          <div style={{ marginBottom: 16 }}>
+            <Label>ประเมินภาวะแทรกซ้อนท้ายรอบเดิน (ติ๊กที่พบ)</Label>
+            <ComplicationPicker selected={complicationChecks.selected} other={complicationChecks.other} onChange={setComplicationChecks} />
           </div>
 
           <div style={{ marginBottom: 16 }}>

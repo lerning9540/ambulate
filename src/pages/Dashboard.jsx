@@ -17,6 +17,7 @@ const CARD_FILTERS = {
   notDone: (t) => !t.status.startsWith('COMPLETED'),
   notReady: (t) => t.readiness === 'NOT_READY',
   discharged: (t) => !!t.patient.dischargedHomeAt,
+  complication: null,
   followup: null,
 };
 
@@ -59,6 +60,7 @@ export default function Dashboard() {
   const cardFilter = activeCard ? CARD_FILTERS[activeCard] : undefined;
   let tasks = (data?.tasks || []).filter((t) => match(t.patient));
   let incidents = (data?.incidents || []).filter((i) => match(i.patient));
+  const complicationRows = (data?.complications || []).filter((c) => match(c.patient));
   if (activeCard) {
     tasks = cardFilter ? tasks.filter(cardFilter) : [];
     incidents = activeCard === 'followup' ? incidents : [];
@@ -73,6 +75,7 @@ export default function Dashboard() {
         { label: 'ยังไม่ได้ดำเนินการ', value: s.notDone, cls: 'pending', note: s.overdue ? `เกินกำหนด ${s.overdue}` : null, filter: 'notDone' },
         { label: 'ผู้ป่วยยังไม่พร้อม', value: s.notReadyPatients, cls: 'notready', filter: 'notReady' },
         { label: 'กลับบ้านแล้ว', value: s.dischargedPatients, cls: 'discharged', filter: 'discharged' },
+        { label: 'ภาวะแทรกซ้อน', value: s.complicationTotal, cls: 'complication', filter: 'complication' },
         { label: 'เหตุการณ์ต้องติดตาม', value: s.openIncidents, cls: 'followup', filter: 'followup' },
       ]
     : [];
@@ -118,7 +121,31 @@ export default function Dashboard() {
           </div>
         )}
 
-        {loading && !data ? (
+        {activeCard === 'complication' ? (
+          <div className="patient-list">
+            {complicationRows.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: 20, color: 'var(--text-muted)' }}>ไม่มีภาวะแทรกซ้อนที่บันทึกในวันนี้</div>
+            ) : (
+              complicationRows.map((c) => (
+                <Link to={`/patient/${c.patient.id}`} key={c.taskId} className="patient-row" style={{ alignItems: 'flex-start' }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div className="patient-row-info">
+                      {c.patient.bed && <span className="patient-row-bed">เตียง {c.patient.bed}</span>}
+                      <span className="patient-row-name" style={{ fontWeight: 600, color: 'var(--text-main)' }}>{c.patient.name}</span>
+                    </div>
+                    <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
+                      AN {c.patient.an} · รอบ {c.roundNo} เวลา {fmtTime(c.scheduledAt)} น.
+                    </div>
+                    <div style={{ fontSize: 13, color: '#9d174d', marginTop: 4 }}>
+                      {c.items.map((i) => i.label).join(', ')}
+                      {c.other && ` (${c.other})`}
+                    </div>
+                  </div>
+                </Link>
+              ))
+            )}
+          </div>
+        ) : loading && !data ? (
           <div style={{ textAlign: 'center', padding: 20, color: 'var(--text-muted)' }}>กำลังโหลดข้อมูล...</div>
         ) : tasks.length === 0 && incidents.length === 0 ? (
           <div style={{ textAlign: 'center', padding: 20, color: 'var(--text-muted)' }}>ไม่มีกิจกรรมในวันนี้</div>
