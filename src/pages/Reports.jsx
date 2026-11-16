@@ -118,6 +118,23 @@ export default function Reports() {
                 <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>ยังไม่มีข้อมูลลุกเดินสำหรับพล็อตกราฟ</div>
               )}
             </div>
+            <div className="chart-card">
+              <div className="chart-title">ภาวะแทรกซ้อนภาพรวม แยกตามชนิด (ในช่วงวันที่เลือก)</div>
+              {data.complicationChart && data.complicationChart.some((c) => c.count > 0) ? (
+                <div style={{ width: '100%', height: 260 }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={data.complicationChart} layout="vertical" margin={{ top: 10, right: 20, left: 10, bottom: 0 }}>
+                      <XAxis type="number" allowDecimals={false} tick={{ fontSize: 12 }} axisLine={false} tickLine={false} />
+                      <YAxis type="category" dataKey="label" width={130} tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
+                      <Tooltip cursor={{ fill: '#f1f5f9' }} />
+                      <Bar dataKey="count" name="จำนวนครั้ง" fill="#9d174d" radius={[0, 4, 4, 0]} barSize={14} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              ) : (
+                <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>ยังไม่มีการบันทึกภาวะแทรกซ้อนในช่วงนี้</div>
+              )}
+            </div>
           </>
         )}
       </div>

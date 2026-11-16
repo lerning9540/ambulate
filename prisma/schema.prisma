@@ -120,7 +120,9 @@ model AmbulationRecord {
   tolerance      String?
   symptomsDuring String?
   symptomsAfter  String?
-  complication   String?                    // ภาวะแทรกซ้อน/เหตุการณ์ผิดปกติ
+  complication   String?                    // ภาวะแทรกซ้อน/เหตุการณ์ผิดปกติ (ข้อความอิสระ)
+  complications      Json?                  // รหัสภาวะแทรกซ้อนที่ติ๊กท้ายรอบเดิน เช่น ["CONSTIPATION"]
+  complicationOther  String?                // รายละเอียดเมื่อเลือก อื่นๆ
   stoppedEarly   Boolean        @default(false)
   note           String?
   recordedById   String?

@@ -2,6 +2,7 @@ import { Router } from 'express';
 import prisma from '../db.js';
 import { audit } from '../services/audit.js';
 import { decorateTask, bangkokDayRange, todayBangkok, isAfterDischarge } from '../services/status.js';
+import { COMPLICATION_LABELS } from '../services/complications.js';
 
 const router = Router();
 
@@ -107,6 +108,17 @@ router.get('/dashboard', async (req, res) => {
       };
     });
 
+    const complicationEvents = tasksRaw
+      .filter((t) => t.record?.complications?.length)
+      .map((t) => ({
+        taskId: t.id,
+        roundNo: t.roundNo,
+        scheduledAt: t.scheduledAt,
+        patient: { id: t.patient.id, an: t.patient.an, name: t.patient.name, bed: t.patient.bed },
+        items: t.record.complications.map((c) => ({ code: c, label: COMPLICATION_LABELS[c] || c })),
+        other: t.record.complicationOther || null,
+      }));
+
     const completed = tasks.filter((t) => t.status.startsWith('COMPLETED'));
     const notReadyPatients = new Set(tasks.filter((t) => t.readiness === 'NOT_READY').map((t) => t.patient.id));
 
@@ -120,10 +132,12 @@ router.get('/dashboard', async (req, res) => {
         notDone: tasks.length - completed.length,
         overdue: tasks.filter((t) => t.status === 'OVERDUE').length,
         notReadyPatients: notReadyPatients.size,
+        complicationTotal: complicationEvents.reduce((sum, c) => sum + c.items.length, 0),
         dischargedPatients: new Set(tasks.filter((t) => t.patient.dischargedHomeAt).map((t) => t.patient.id)).size,
         openIncidents: openIncidents.length,
       },
       tasks,
+      complications: complicationEvents,
       incidents: openIncidents,
     });
   } catch (error) {
@@ -161,6 +175,12 @@ router.get('/reports', async (req, res) => {
     const h = Math.floor(avgMs / 3600000);
     const m = Math.floor((avgMs % 3600000) / 60000);
 
+    const complicationCounts = Object.fromEntries(Object.keys(COMPLICATION_LABELS).map((k) => [k, 0]));
+    for (const t of tasks) {
+      for (const c of t.record?.complications || []) complicationCounts[c] = (complicationCounts[c] || 0) + 1;
+    }
+    const complicationChart = Object.keys(COMPLICATION_LABELS).map((k) => ({ label: COMPLICATION_LABELS[k], count: complicationCounts[k] }));
+
     const daily = {};
     for (const t of tasks) {
       const day = new Date(new Date(t.scheduledAt).getTime() + 7 * 3600000).toISOString().slice(0, 10);
@@ -195,6 +215,7 @@ router.get('/reports', async (req, res) => {
       completionRate: pct(completed.length, tasks.length),
       avgTimeStr: diffs.length ? (h > 0 ? `${h} ชม. ${m} นาที` : `${m} นาที`) : '-',
       chartData,
+      complicationChart,
     });
   } catch (error) {
     console.error('Error generating reports:', error);
