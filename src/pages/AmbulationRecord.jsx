@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { ambulationAPI, taskAPI } from '../services/api';
 import Header from '../components/Header';
 import { useAuth } from '../context/AuthContext';
-import { fmtDateTime, toLocalInput } from '../lib/status';
+import { fmtDateTime } from '../lib/status';
 
 const ASSIST_LEVELS = ['เดินได้ด้วยตนเอง', 'ต้องมีผู้ช่วยพยุง', 'ต้องใช้เครื่องช่วยเดิน', 'ต้องมีเจ้าหน้าที่ช่วยเหลือ'];
 const SYMPTOMS = ['เวียนศีรษะ', 'เหนื่อย', 'ปวดแผล', 'หน้ามืด', 'ใจสั่น'];
@@ -81,10 +81,10 @@ export default function AmbulationRecord({ showToast }) {
   const { user } = useAuth();
   const [task, setTask] = useState(null);
 
-  const now = toLocalInput(new Date());
+  // เวลาเริ่ม/สิ้นสุดจับจากเครื่องตอนกดปุ่ม ไม่ให้กรอกย้อนหลัง
   const [form, setForm] = useState({
-    startTime: now,
-    endTime: now,
+    startTime: '',
+    endTime: '',
     distance: '',
     duration: '',
     assistLevel: '',
@@ -107,6 +107,7 @@ export default function AmbulationRecord({ showToast }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!form.startTime || !form.endTime) return showToast('กรุณากดปุ่มจับเวลาเริ่มและสิ้นสุด', 'error');
     if (!form.assistLevel) return showToast('กรุณาเลือกระดับการช่วยเหลือ', 'error');
     if (!form.distance && !form.duration && !form.stoppedEarly) return showToast('กรุณาระบุระยะทางหรือระยะเวลาที่เดิน', 'error');
     setLoading(true);
@@ -153,18 +154,22 @@ export default function AmbulationRecord({ showToast }) {
             </div>
           </div>
 
-          <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
             <div style={{ flex: 1 }}>
               <Label>เวลาเริ่มจริง</Label>
-              <input type="datetime-local" className="form-input" style={{ marginBottom: 0 }} value={form.startTime} onChange={(e) => set('startTime', e.target.value)} />
+              <button type="button" className="btn btn-primary" style={{ marginBottom: 0 }} onClick={() => set('startTime', new Date().toISOString())}>
+                {form.startTime ? fmtDateTime(form.startTime) : 'กดเมื่อเริ่มเดิน'}
+              </button>
             </div>
             <div style={{ flex: 1 }}>
               <Label>เวลาสิ้นสุด</Label>
-              <input type="datetime-local" className="form-input" style={{ marginBottom: 0 }} value={form.endTime} onChange={(e) => set('endTime', e.target.value)} />
+              <button type="button" className="btn btn-primary" style={{ marginBottom: 0 }} onClick={() => set('endTime', new Date().toISOString())}>
+                {form.endTime ? fmtDateTime(form.endTime) : 'กดเมื่อเดินเสร็จ'}
+              </button>
             </div>
           </div>
-          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: -10, marginBottom: 16 }}>
-            ตรงเวลา/ล่าช้า คิดจากเวลาเริ่มจริง ไม่ใช่เวลาที่กดบันทึก
+          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 16 }}>
+            เวลาถูกจับจากเครื่องตอนที่กดปุ่ม ไม่สามารถกรอกย้อนหลังได้ ตรงเวลา/ล่าช้า คิดจากเวลาเริ่มจริง
           </div>
 
           <div style={{ marginBottom: 16 }}>
