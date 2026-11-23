@@ -39,4 +39,23 @@ router.post('/', async (req, res) => {
   }
 });
 
+// PUT แก้วันที่/เวลาที่ประเมิน { assessedAt } (เก็บ audit ไว้)
+router.put('/:id', async (req, res) => {
+  try {
+    const assessedAt = new Date(req.body.assessedAt);
+    if (Number.isNaN(assessedAt.getTime())) return res.status(400).json({ error: 'วันที่และเวลาที่ประเมินไม่ถูกต้อง' });
+    if (assessedAt > new Date(Date.now() + 5 * 60000)) return res.status(400).json({ error: 'วันที่ประเมินต้องไม่เป็นเวลาในอนาคต' });
+
+    const old = await prisma.assessment.findUnique({ where: { id: req.params.id } });
+    if (!old) return res.status(404).json({ error: 'ไม่พบการประเมิน' });
+
+    const assessment = await prisma.assessment.update({ where: { id: old.id }, data: { assessedAt } });
+    await audit(req, 'UPDATE', 'Assessment', assessment.id, { assessedAt: { from: old.assessedAt, to: assessedAt } });
+    res.json(assessment);
+  } catch (error) {
+    console.error('Error updating assessment time:', error);
+    res.status(500).json({ error: 'ไม่สามารถแก้เวลาการประเมินได้' });
+  }
+});
+
 export default router;

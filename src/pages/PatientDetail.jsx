@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { patientAPI, taskAPI, incidentAPI } from '../services/api';
+import { patientAPI, taskAPI, incidentAPI, assessmentAPI } from '../services/api';
 import Header from '../components/Header';
 import { useAuth } from '../context/AuthContext';
 import { StatusPill, fmtDateTime, toLocalInput } from '../lib/status';
@@ -14,6 +14,7 @@ export default function PatientDetail({ showToast }) {
   const [loading, setLoading] = useState(true);
   const [newTime, setNewTime] = useState('');
   const [editing, setEditing] = useState(null); // { taskId, value }
+  const [editingAssess, setEditingAssess] = useState(null); // { id, value }
 
   const load = useCallback(async () => {
     try {
@@ -71,6 +72,17 @@ export default function PatientDetail({ showToast }) {
       await taskAPI.reschedule(editing.taskId, new Date(editing.value).toISOString());
       setEditing(null);
       showToast('แก้เวลาแล้ว (เก็บประวัติไว้)');
+      load();
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  };
+
+  const saveAssessTime = async () => {
+    try {
+      await assessmentAPI.updateTime(editingAssess.id, new Date(editingAssess.value).toISOString());
+      setEditingAssess(null);
+      showToast('แก้เวลาประเมินแล้ว');
       load();
     } catch (err) {
       showToast(err.message, 'error');
@@ -223,9 +235,18 @@ export default function PatientDetail({ showToast }) {
                   <span className="info-label">ประเมินล่าสุด</span>
                   <span className="info-value" style={{ textAlign: 'right' }}>
                     <StatusPill status={latest.result} small />
-                    <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
-                      {fmtDateTime(latest.assessedAt)} โดย {latest.assessedByName || '-'}
-                    </div>
+                    {editingAssess?.id === latest.id ? (
+                      <div style={{ display: 'flex', gap: 6, marginTop: 4, justifyContent: 'flex-end' }}>
+                        <input type="datetime-local" className="form-input" style={{ marginBottom: 0, width: 'auto' }} value={editingAssess.value} onChange={(e) => setEditingAssess({ ...editingAssess, value: e.target.value })} />
+                        <button className="btn btn-primary" style={{ width: 'auto', padding: '4px 10px', fontSize: 12 }} onClick={saveAssessTime}>บันทึก</button>
+                        <button className="btn" style={{ width: 'auto', padding: '4px 10px', fontSize: 12 }} onClick={() => setEditingAssess(null)}>ยกเลิก</button>
+                      </div>
+                    ) : (
+                      <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
+                        {fmtDateTime(latest.assessedAt)} โดย {latest.assessedByName || '-'}
+                        <Pencil size={12} style={{ marginLeft: 6, cursor: 'pointer', color: 'var(--primary-blue)', verticalAlign: 'middle' }} onClick={() => setEditingAssess({ id: latest.id, value: toLocalInput(latest.assessedAt) })} />
+                      </div>
+                    )}
                   </span>
                 </div>
               )}
