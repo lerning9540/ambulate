@@ -90,4 +90,30 @@ router.post('/', async (req, res) => {
   }
 });
 
+// PUT แก้เวลาเดินจริง { startTime, endTime } (เก็บ audit ไว้)
+router.put('/:id', async (req, res) => {
+  try {
+    const old = await prisma.ambulationRecord.findUnique({ where: { id: req.params.id } });
+    if (!old) return res.status(404).json({ error: 'ไม่พบผลการเดิน' });
+
+    const startTime = new Date(req.body.startTime);
+    const endTime = new Date(req.body.endTime);
+    if (Number.isNaN(startTime.getTime()) || Number.isNaN(endTime.getTime())) {
+      return res.status(400).json({ error: 'กรุณาระบุเวลาเริ่มและเวลาสิ้นสุด' });
+    }
+    if (endTime < startTime) return res.status(400).json({ error: 'เวลาสิ้นสุดต้องไม่ก่อนเวลาเริ่ม' });
+    if (startTime > new Date(Date.now() + 5 * 60000)) return res.status(400).json({ error: 'เวลาเริ่มต้องไม่เป็นเวลาในอนาคต' });
+
+    const record = await prisma.ambulationRecord.update({ where: { id: old.id }, data: { startTime, endTime } });
+    await audit(req, 'UPDATE', 'AmbulationRecord', record.id, {
+      startTime: { from: old.startTime, to: startTime },
+      endTime: { from: old.endTime, to: endTime },
+    });
+    res.json(record);
+  } catch (error) {
+    console.error('Error updating ambulation times:', error);
+    res.status(500).json({ error: 'ไม่สามารถแก้เวลาการเดินได้' });
+  }
+});
+
 export default router;
