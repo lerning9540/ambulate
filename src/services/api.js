@@ -62,6 +62,7 @@ export const assessmentAPI = {
 
 export const ambulationAPI = {
   create: (data) => fetchAPI('/ambulations', json('POST', data)),
+  updateTimes: (id, startTime, endTime) => fetchAPI(`/ambulations/${id}`, json('PUT', { startTime, endTime })),
 };
 
 export const incidentAPI = {

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { patientAPI, taskAPI, incidentAPI, assessmentAPI } from '../services/api';
+import { patientAPI, taskAPI, incidentAPI, assessmentAPI, ambulationAPI } from '../services/api';
 import Header from '../components/Header';
 import { useAuth } from '../context/AuthContext';
 import { StatusPill, fmtDateTime, toLocalInput } from '../lib/status';
@@ -15,6 +15,8 @@ export default function PatientDetail({ showToast }) {
   const [newTime, setNewTime] = useState('');
   const [editing, setEditing] = useState(null); // { taskId, value }
   const [editingAssess, setEditingAssess] = useState(null); // { id, value }
+  const [editingRecord, setEditingRecord] = useState(null); // { id, start, end }
+  const [editingDischarge, setEditingDischarge] = useState(null); // value (datetime-local) | null
 
   const load = useCallback(async () => {
     try {
@@ -83,6 +85,28 @@ export default function PatientDetail({ showToast }) {
       await assessmentAPI.updateTime(editingAssess.id, new Date(editingAssess.value).toISOString());
       setEditingAssess(null);
       showToast('แก้เวลาประเมินแล้ว');
+      load();
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  };
+
+  const saveRecordTimes = async () => {
+    try {
+      await ambulationAPI.updateTimes(editingRecord.id, new Date(editingRecord.start).toISOString(), new Date(editingRecord.end).toISOString());
+      setEditingRecord(null);
+      showToast('แก้เวลาเดินจริงแล้ว');
+      load();
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  };
+
+  const saveDischargeTime = async () => {
+    try {
+      await patientAPI.update(id, { dischargedHomeAt: new Date(editingDischarge).toISOString() });
+      setEditingDischarge(null);
+      showToast('แก้เวลากลับบ้านแล้ว');
       load();
     } catch (err) {
       showToast(err.message, 'error');
@@ -176,9 +200,19 @@ export default function PatientDetail({ showToast }) {
           </div>
         )}
 
-        {patient.dischargedHomeAt ? (
+        {patient.dischargedHomeAt && editingDischarge !== null ? (
+          <div className="detail-card" style={{ padding: 12, marginBottom: 12, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', background: '#e8f5e9' }}>
+            <span style={{ color: '#1b5e20', fontWeight: 600, fontSize: 14 }}>เวลากลับบ้าน</span>
+            <input type="datetime-local" className="form-input" style={{ marginBottom: 0, width: 'auto' }} value={editingDischarge} onChange={(e) => setEditingDischarge(e.target.value)} />
+            <button className="btn btn-primary" style={{ width: 'auto', padding: '4px 12px', fontSize: 13 }} onClick={saveDischargeTime}>บันทึก</button>
+            <button className="btn" style={{ width: 'auto', padding: '4px 12px', fontSize: 13 }} onClick={() => setEditingDischarge(null)}>ยกเลิก</button>
+          </div>
+        ) : patient.dischargedHomeAt ? (
           <div className="detail-card" style={{ padding: 12, marginBottom: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, background: '#e8f5e9' }}>
-            <span style={{ color: '#1b5e20', fontWeight: 600, fontSize: 14 }}>กลับบ้านแล้ว · {fmtDateTime(patient.dischargedHomeAt)} น.</span>
+            <span style={{ color: '#1b5e20', fontWeight: 600, fontSize: 14 }}>
+              กลับบ้านแล้ว · {fmtDateTime(patient.dischargedHomeAt)} น.
+              <Pencil size={14} style={{ marginLeft: 8, cursor: 'pointer', color: 'var(--primary-blue)' }} onClick={() => setEditingDischarge(toLocalInput(patient.dischargedHomeAt))} />
+            </span>
             <button className="btn" style={{ width: 'auto', padding: '4px 12px', fontSize: 13 }} onClick={() => setDischarged(false)}>ยกเลิก</button>
           </div>
         ) : (
@@ -260,7 +294,21 @@ export default function PatientDetail({ showToast }) {
 
               {t.record ? (
                 <div style={{ fontSize: 13, marginTop: 8 }}>
-                  <div>เดินจริง {fmtDateTime(t.record.startTime)} – {fmtDateTime(t.record.endTime)}</div>
+                  {editingRecord?.id === t.record.id ? (
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', marginBottom: 6 }}>
+                      <span>เดินจริง</span>
+                      <input type="datetime-local" className="form-input" style={{ marginBottom: 0, width: 'auto' }} value={editingRecord.start} onChange={(e) => setEditingRecord({ ...editingRecord, start: e.target.value })} />
+                      <span>–</span>
+                      <input type="datetime-local" className="form-input" style={{ marginBottom: 0, width: 'auto' }} value={editingRecord.end} onChange={(e) => setEditingRecord({ ...editingRecord, end: e.target.value })} />
+                      <button className="btn btn-primary" style={{ width: 'auto', padding: '4px 10px', fontSize: 12 }} onClick={saveRecordTimes}>บันทึก</button>
+                      <button className="btn" style={{ width: 'auto', padding: '4px 10px', fontSize: 12 }} onClick={() => setEditingRecord(null)}>ยกเลิก</button>
+                    </div>
+                  ) : (
+                    <div>
+                      เดินจริง {fmtDateTime(t.record.startTime)} – {fmtDateTime(t.record.endTime)}
+                      <Pencil size={14} style={{ marginLeft: 8, cursor: 'pointer', color: 'var(--primary-blue)' }} onClick={() => setEditingRecord({ id: t.record.id, start: toLocalInput(t.record.startTime), end: toLocalInput(t.record.endTime) })} />
+                    </div>
+                  )}
                   <div>
                     {t.record.distance != null && `ระยะทาง ${t.record.distance} เมตร `}
                     {t.record.duration != null && `ใช้เวลา ${t.record.duration} นาที `}
