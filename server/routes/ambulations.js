@@ -22,6 +22,11 @@ router.post('/', async (req, res) => {
     }
     if (endTime < startTime) return res.status(400).json({ error: 'เวลาสิ้นสุดต้องไม่ก่อนเวลาเริ่ม' });
     if (startTime > new Date(Date.now() + 5 * 60000)) return res.status(400).json({ error: 'เวลาเริ่มต้องไม่เป็นเวลาในอนาคต' });
+
+    // วันที่/เวลาที่บันทึกผล: ถ้าไม่ส่งมาใช้เวลาปัจจุบันของ server
+    const recordedAt = b.recordedAt ? new Date(b.recordedAt) : new Date();
+    if (Number.isNaN(recordedAt.getTime())) return res.status(400).json({ error: 'วันที่และเวลาที่บันทึกผลไม่ถูกต้อง' });
+    if (recordedAt > new Date(Date.now() + 5 * 60000)) return res.status(400).json({ error: 'วันที่บันทึกผลต้องไม่เป็นเวลาในอนาคต' });
     if (!ASSIST_LEVELS.includes(b.assistLevel)) return res.status(400).json({ error: 'กรุณาเลือกระดับการช่วยเหลือ' });
     if (b.distance == null && b.duration == null && !b.stoppedEarly) {
       return res.status(400).json({ error: 'กรุณาระบุระยะทางหรือระยะเวลาที่เดิน' });
@@ -49,6 +54,7 @@ router.post('/', async (req, res) => {
         complicationOther: complications.includes('OTHER') ? complicationOther : null,
         stoppedEarly: Boolean(b.stoppedEarly),
         note: b.note || null,
+        recordedAt,
         recordedById: req.user.id,
         recordedByName: req.user.name,
       },

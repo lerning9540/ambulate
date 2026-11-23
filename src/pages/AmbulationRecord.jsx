@@ -85,6 +85,7 @@ export default function AmbulationRecord({ showToast }) {
   const [form, setForm] = useState({
     startTime: now,
     endTime: now,
+    recordedAt: now,
     distance: '',
     duration: '',
     assistLevel: '',
@@ -109,12 +110,14 @@ export default function AmbulationRecord({ showToast }) {
     e.preventDefault();
     if (!form.assistLevel) return showToast('กรุณาเลือกระดับการช่วยเหลือ', 'error');
     if (!form.distance && !form.duration && !form.stoppedEarly) return showToast('กรุณาระบุระยะทางหรือระยะเวลาที่เดิน', 'error');
+    if (!form.recordedAt) return showToast('กรุณาระบุวันที่และเวลาที่บันทึกผล', 'error');
     setLoading(true);
     try {
       await ambulationAPI.create({
         taskId,
         startTime: new Date(form.startTime).toISOString(),
         endTime: new Date(form.endTime).toISOString(),
+        recordedAt: new Date(form.recordedAt).toISOString(),
         distance: form.distance === '' ? null : form.distance,
         duration: form.duration === '' ? null : form.duration,
         assistLevel: form.assistLevel,
@@ -165,6 +168,14 @@ export default function AmbulationRecord({ showToast }) {
           </div>
           <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: -10, marginBottom: 16 }}>
             ตรงเวลา/ล่าช้า คิดจากเวลาเริ่มจริง ไม่ใช่เวลาที่กดบันทึก
+          </div>
+
+          <div style={{ marginBottom: 16 }}>
+            <Label>วันที่และเวลาที่บันทึกผล</Label>
+            <input type="datetime-local" className="form-input" style={{ marginBottom: 0 }} value={form.recordedAt} onChange={(e) => set('recordedAt', e.target.value)} />
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
+              ค่าเริ่มต้นคือเวลาเครื่องตอนเปิดฟอร์ม แก้ไขได้ (ใช้สำหรับบันทึกย้อนหลัง)
+            </div>
           </div>
 
           <div style={{ marginBottom: 16 }}>
